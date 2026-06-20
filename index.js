@@ -256,7 +256,7 @@ if (interaction.commandName === 'leaderboard') {
                 inline: false
             }
         );
-
+try {
     await appendSubmissionToSheet({
         discordId: submittedUserId,
         displayName: deniedDisplayName,
@@ -268,7 +268,9 @@ if (interaction.commandName === 'leaderboard') {
         reviewedBy: interaction.user.tag,
         rejectionReason: denialReason
     });
-
+} catch (error) {
+     console.error('Failed to write to Google Sheets',error.message);
+}
     try {
         const submittedUser = await client.users.fetch(submittedUserId);
 
@@ -330,6 +332,7 @@ if (!hasAllowedRole) {
                     value: `Accepted by <@${interaction.user.id}>`,
                     inline: false
                 });
+try {
 await appendSubmissionToSheet({
     discordId: submittedUserId,
     displayName: oldEmbed.fields.find(f => f.name === 'Display Name')?.value || 'Unknown',
@@ -340,6 +343,9 @@ await appendSubmissionToSheet({
     status: 'Accepted',
     reviewedBy: interaction.user.tag
 });
+} catch (error) {
+    console.error('Failed to write to Google Sheets:', error.message);
+}
 const acceptedSpecies = oldEmbed.fields.find(f => f.name === 'Species')?.value || 'Unknown';
 const acceptedEvolution = oldEmbed.fields.find(f => f.name === 'Evolutionary Standing')?.value || 'Unknown';
 
