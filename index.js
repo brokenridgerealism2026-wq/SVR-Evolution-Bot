@@ -114,7 +114,7 @@ if (interaction.commandName === 'leaderboard') {
 
     const leaderboardText = leaderboard
         .map((entry, index) => {
-            const medals = ['🥇', '🥈', '🥉'];
+            const medals = ['<:GoldComet:1518241418269823186>', '<:SilverComet:1518241462137913426>', '<:BronzeComet:1518241523483807994>'];
             const rank = medals[index] || `${index + 1}.`;
 
             return `${rank} ${entry.displayName} — ${entry.count}`;
@@ -123,7 +123,7 @@ if (interaction.commandName === 'leaderboard') {
 
     return interaction.reply({
         content:
-            `🏆 **Evolution Leaderboard**\n\n` +
+            `<:Meteorite:1504809803791335517> **Evolution Leaderboard**\n\n` +
             leaderboardText
     });
 }
@@ -399,7 +399,7 @@ cron.schedule('0 9 * * *', async () => {
         const leaderboardText = leaderboard
             .map((entry, index) => {
 
-                const medals = ['🥇', '🥈', '🥉'];
+                const medals = ['<:GoldComet:1518241418269823186>', '<:SilverComet:1518241462137913426>', '<:BronzeComet:1518241523483807994>'];
                 const rank = medals[index] || `${index + 1}.`;
 
                 return `${rank} ${entry.displayName} — ${entry.count}`;
@@ -411,7 +411,7 @@ cron.schedule('0 9 * * *', async () => {
         );
 
         await channel.send(
-            `🏆 **Daily Evolution Leaderboard**\n\n${leaderboardText}`
+            `<:Meteorite:1504809803791335517> **Daily Evolution Leaderboard**\n\n${leaderboardText}`
         );
 
     } catch (error) {
