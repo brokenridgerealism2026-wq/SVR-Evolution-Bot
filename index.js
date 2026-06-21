@@ -123,7 +123,8 @@ if (interaction.commandName === 'leaderboard') {
 
     return interaction.reply({
         content:
-            `<:Meteorite:1504809803791335517> **Evolution Leaderboard**\n\n` +
+            `<:Meteorite:1504809803791335517> **Evolution Leaderboard**\n` +
+            `───────────⋆｡ﾟ☄｡⋆｡ ﾟ☾ ﾟ｡⋆───────────`\n\n
             leaderboardText
     });
 }
