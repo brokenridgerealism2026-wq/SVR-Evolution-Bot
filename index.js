@@ -386,7 +386,7 @@ try {
 }
     }
 });
-cron.schedule('0 9 * * *', async () => {
+cron.schedule('0 14 * * *', async () => {
 
     console.log('Posting daily leaderboard...');
 
