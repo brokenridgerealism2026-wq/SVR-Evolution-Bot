@@ -15,30 +15,30 @@ const commands = [
 
 new SlashCommandBuilder()
     .setName('skinrandomizer')
-    .setDescription('Roll hatchling genetics from parent skins and eye colors')
+    .setDescription('Roll Skin Genetics from your nest - DO NOT list mutated skin names')
     .addStringOption(option =>
         option.setName('mother_dominant')
-            .setDescription('Mother dominant skin - required')
+            .setDescription('Mother dominant skin - Do not list mutated skin names')
             .setRequired(true))
     .addStringOption(option =>
         option.setName('mother_recessive_1')
-            .setDescription('Mother recessive skin 1 - required')
+            .setDescription('Mother recessive skin 1 - Do not list mutated skin names')
             .setRequired(true))
     .addStringOption(option =>
         option.setName('father_dominant')
-            .setDescription('Father dominant skin - required')
+            .setDescription('Father dominant skin - Do not list mutated skin names')
             .setRequired(true))
     .addStringOption(option =>
         option.setName('father_recessive_1')
-            .setDescription('Father recessive skin 1 - required')
+            .setDescription('Father recessive skin 1 - Do not list mutated skin names')
             .setRequired(true))
     .addStringOption(option =>
         option.setName('mother_eyes')
-            .setDescription('Mother eye color - required')
+            .setDescription('Mother eye color - Do not list mutated skin names')
             .setRequired(true))
     .addStringOption(option =>
         option.setName('father_eyes')
-            .setDescription('Father eye color - required')
+            .setDescription('Father eye color - Do not list mutated skin names')
             .setRequired(true))
     .addStringOption(option =>
         option.setName('mother_recessive_2')
