@@ -202,7 +202,7 @@ if (recessivePool.length > 0) {
             },
             {
                 name: 'Dominant Skin',
-                value: skin,
+                value: `• ${skin}`,
                 inline: false
             },
             {
