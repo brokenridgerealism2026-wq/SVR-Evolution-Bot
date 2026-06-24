@@ -136,19 +136,26 @@ if (interaction.commandName === 'skinrandomizer') {
         skinPool[Math.floor(Math.random() * skinPool.length)];
 
     // Roll recessive skins
-    const recessivePool = skinPool.filter(
+    const uniqueSkinPool = [...new Set(skinPool)];
+
+    const recessivePool = uniqueSkinPool.filter(
         skin => skin !== dominantSkin
     );
 
-    const recessiveOne =
-        recessivePool[Math.floor(Math.random() * recessivePool.length)];
+    let recessiveOne = 'None';
+    let recessiveTwo = 'None';
 
+    if (recessivePool.length >= 1) {
+    recessiveOne = recessivePool[Math.floor(Math.random() * recessivePool.length)];
+    }
+
+    if (recessivePool.length >= 2) {
     const recessiveTwoPool = recessivePool.filter(
         skin => skin !== recessiveOne
     );
 
-    const recessiveTwo =
-        recessiveTwoPool[Math.floor(Math.random() * recessiveTwoPool.length)];
+    recessiveTwo = recessiveTwoPool[Math.floor(Math.random() * recessiveTwoPool.length)];
+    }
 
     // Roll eye color
     const eyeColor =
@@ -201,14 +208,14 @@ await interaction.reply({
 
 // Slash command: /leaderboard
 if (interaction.commandName === 'leaderboard') {
+    await interaction.deferReply();
 
     const leaderboard = await getLeaderboardFromSheet();
 
     if (leaderboard.length === 0) {
-        return interaction.reply({
-            content: 'No accepted submissions have been recorded yet.',
-            ephemeral: true
-        });
+        return interaction.editReply({
+    content: 'No accepted submissions have been recorded yet.'
+});
     }
 
     const leaderboardText = leaderboard
@@ -220,12 +227,12 @@ if (interaction.commandName === 'leaderboard') {
         })
         .join('\n');
 
-    return interaction.reply({
-        content:
-            `<:Meteorite:1504809803791335517> **Evolution Leaderboard**\n` +
-            `───────────⋆｡ﾟ☄｡⋆｡ ﾟ☾ ﾟ｡⋆───────────\n\n` +
-            leaderboardText
-    });
+    return interaction.editReply({
+    content:
+        `<:Meteorite:1504809803791335517> **Evolution Leaderboard**\n` +
+        `───────────⋆｡ﾟ☄｡⋆｡ ﾟ☾ ﾟ｡⋆───────────\n\n` +
+        leaderboardText
+});
 }
 
     // Slash command: /standing
