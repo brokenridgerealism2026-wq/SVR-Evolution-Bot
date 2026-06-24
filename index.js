@@ -54,6 +54,30 @@ const auth = new google.auth.GoogleAuth({
     });
 }
 
+async function getOrphanSkins(species) {
+    const credentials = process.env.GOOGLE_CREDENTIALS_JSON
+        ? JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON)
+        : require('./google-credentials.json');
+
+    const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+
+    const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.SHEET_ID,
+        range: 'OrphanSkins!A:C'
+    });
+
+    const rows = response.data.values || [];
+
+    return rows.slice(1).filter(row =>
+        row[0]?.toLowerCase() === species.toLowerCase()
+    );
+}
+
 async function getLeaderboardFromSheet() {
     const credentials = process.env.GOOGLE_CREDENTIALS_JSON
     ? JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON)
@@ -99,6 +123,111 @@ const auth = new google.auth.GoogleAuth({
 }
 
 client.on('interactionCreate', async interaction => {
+
+// Slash command: /orphan
+if (interaction.commandName === 'orphan') {
+
+    await interaction.deferReply();
+
+    const species = interaction.options.getString('species');
+
+    const rows = await getOrphanSkins(species);
+
+    if (rows.length === 0) {
+        return interaction.editReply({
+            content: `No skins found for **${species}**.`
+        });
+    }
+
+    // Build weighted skin pool
+    const skinPool = [];
+
+    for (const row of rows) {
+
+        const skin = row[1];
+        const weight = Number(row[2]) || 1;
+
+        for (let i = 0; i < weight; i++) {
+            skinPool.push(skin);
+        }
+    }
+
+    // Roll dominant skin
+        const skin =
+        skinPool[Math.floor(Math.random() * skinPool.length)];
+
+    // Roll 1 or 2 recessive skins from unique remaining skins
+        const uniqueSkins = [...new Set(skinPool)];
+
+        const recessivePool = uniqueSkins.filter(
+        possibleSkin => possibleSkin !== skin
+);
+
+        let recessiveSkins = [];
+
+if (recessivePool.length > 0) {
+    const recessiveCount = recessivePool.length === 1
+        ? 1
+        : Math.floor(Math.random() * 2) + 1; // 1 or 2
+
+    while (recessiveSkins.length < recessiveCount) {
+        const randomSkin = recessivePool[
+            Math.floor(Math.random() * recessivePool.length)
+        ];
+
+        if (!recessiveSkins.includes(randomSkin)) {
+            recessiveSkins.push(randomSkin);
+        }
+    }
+}
+    // Roll pattern
+    const pattern =
+        Math.floor(Math.random() * 3) + 1;
+
+    // Roll 6 colors (5 zones + eye color)
+    const colors = Array.from(
+        { length: 6 },
+        () => Math.floor(Math.random() * 5) + 1
+    ).join('');
+
+    const orphanEmbed = new EmbedBuilder()
+        .setColor(0xD6A84F)
+        .setTitle('🥚 Orphan Genetics')
+        .setDescription('⚠️ While this does give you genetics for your orphan please make sure that you are adhering to species dimorphism requirements! This may mean that you have to deviate slightly from what the bot gives you.⚠️  ')
+        .addFields(
+            {
+                name: 'Species',
+                value: species,
+                inline: false
+            },
+            {
+                name: 'Dominant Skin',
+                value: skin,
+                inline: false
+            },
+            {
+                name: 'Recessive Skins',
+                value: recessiveSkins.length > 0
+                    ? recessiveSkins.map(skin => `• ${skin}`).join('\n')
+                    : 'None',
+                inline: false
+            },
+            {
+                name: 'Pattern & Colors',
+                value: `${pattern} (${colors})`,
+                inline: false
+            }
+        )
+        .setFooter({
+            text: 'Silent Valley Office thanks you for your visit'
+        })
+        .setTimestamp();
+
+    await interaction.editReply({
+        embeds: [orphanEmbed]
+    });
+
+}
 
 // Slash command: /skinrandomizer
 if (interaction.commandName === 'skinrandomizer') {

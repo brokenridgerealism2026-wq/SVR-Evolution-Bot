@@ -57,6 +57,16 @@ new SlashCommandBuilder()
             .setDescription('Father recessive skin 3')
             .setRequired(false))
     .toJSON(),
+
+new SlashCommandBuilder()
+    .setName('orphan')
+    .setDescription('Hatch your Baby with predetermined Genetics - Mutated skins are not included')
+    .addStringOption(option =>
+        option.setName('species')
+            .setDescription('Species name')
+            .setRequired(true))
+    .toJSON(),
+
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
