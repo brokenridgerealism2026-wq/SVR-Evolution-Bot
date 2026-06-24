@@ -100,6 +100,105 @@ const auth = new google.auth.GoogleAuth({
 
 client.on('interactionCreate', async interaction => {
 
+// Slash command: /skinrandomizer
+if (interaction.commandName === 'skinrandomizer') {
+
+    const motherDominant = interaction.options.getString('mother_dominant');
+    const motherRecessive1 = interaction.options.getString('mother_recessive_1');
+    const motherRecessive2 = interaction.options.getString('mother_recessive_2');
+    const motherRecessive3 = interaction.options.getString('mother_recessive_3');
+
+    const fatherDominant = interaction.options.getString('father_dominant');
+    const fatherRecessive1 = interaction.options.getString('father_recessive_1');
+    const fatherRecessive2 = interaction.options.getString('father_recessive_2');
+    const fatherRecessive3 = interaction.options.getString('father_recessive_3');
+
+    const motherEyes = interaction.options.getString('mother_eyes');
+    const fatherEyes = interaction.options.getString('father_eyes');
+
+    // Build weighted skin pool
+    const skinPool = [
+        motherDominant,
+        motherDominant,
+        motherRecessive1,
+        motherRecessive2,
+        motherRecessive3,
+
+        fatherDominant,
+        fatherDominant,
+        fatherRecessive1,
+        fatherRecessive2,
+        fatherRecessive3
+    ].filter(Boolean);
+
+    // Roll dominant skin
+    const dominantSkin =
+        skinPool[Math.floor(Math.random() * skinPool.length)];
+
+    // Roll recessive skins
+    const recessivePool = skinPool.filter(
+        skin => skin !== dominantSkin
+    );
+
+    const recessiveOne =
+        recessivePool[Math.floor(Math.random() * recessivePool.length)];
+
+    const recessiveTwoPool = recessivePool.filter(
+        skin => skin !== recessiveOne
+    );
+
+    const recessiveTwo =
+        recessiveTwoPool[Math.floor(Math.random() * recessiveTwoPool.length)];
+
+    // Roll eye color
+    const eyeColor =
+        [motherEyes, fatherEyes][Math.floor(Math.random() * 2)];
+
+    // Roll pattern
+    const pattern = Math.floor(Math.random() * 3) + 1;
+
+    // Roll color zones
+    const colorZones = Array.from(
+        { length: 5 },
+        () => Math.floor(Math.random() * 5) + 1
+    ).join('');
+
+    const geneticsEmbed = new EmbedBuilder()
+    .setColor(0xD6A84F)
+    .setTitle('<:Meteorite:1504809803791335517> Hatchling Genetics <:Meteorite:1504809803791335517>')
+    .setDescription('──────⋆｡ﾟ☄｡⋆｡ ﾟ☾ ﾟ｡⋆──────')
+    .addFields(
+        {
+            name: '🧬 Dominant Skin',
+            value: dominantSkin,
+            inline: false
+        },
+        {
+            name: '🧬 Recessive Skins',
+            value: `• ${recessiveOne}\n• ${recessiveTwo}`,
+            inline: false
+        },
+        {
+            name: '🎨 Pattern & Colors',
+            value: `• ${pattern} (${colorZones})`,
+            inline: true
+        },
+        {
+            name: '🎨 Eye Color',
+            value: `• ${eyeColor}`,
+            inline: true
+        }
+    )
+    .setFooter({
+        text: 'Silent Valley Genetics'
+    })
+    .setTimestamp();
+
+await interaction.reply({
+    embeds: [geneticsEmbed]
+});
+}
+
 // Slash command: /leaderboard
 if (interaction.commandName === 'leaderboard') {
 
