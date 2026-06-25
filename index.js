@@ -218,6 +218,8 @@ if (recessivePool.length > 0) {
                 inline: false
             }
         )
+        .setImage('https://cdn.discordapp.com/attachments/1481648385076236442/1519501842835439626/PathOfTitans-Win64-Shipping_Screenshot_2026.06.24_-_19.32.31.16.png?ex=6a3dc9de&is=6a3c785e&hm=49640dd445752d68755e18a3e846f19d862c0cb41725ff5fe0ee9bd1e443d8d2'
+        )
         .setFooter({
             text: 'Silent Valley Office thanks you for your visit'
         })
