@@ -67,6 +67,16 @@ new SlashCommandBuilder()
             .setRequired(true))
     .toJSON(),
 
+new SlashCommandBuilder()
+    .setName('ataglance')
+    .setDescription('Shows the field guide for the requested species.')
+    .addStringOption(option =>
+        option.setName('species')
+            .setDescription('Full species name')
+            .setRequired(true)
+            .setAutocomplete(true))
+    .toJSON(),
+
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);

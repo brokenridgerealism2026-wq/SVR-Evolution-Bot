@@ -54,6 +54,65 @@ const auth = new google.auth.GoogleAuth({
     });
 }
 
+async function getSpeciesList() {
+
+    const credentials = process.env.GOOGLE_CREDENTIALS_JSON
+        ? JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON)
+        : require('./google-credentials.json');
+
+    const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+
+    const sheets = google.sheets({
+        version: 'v4',
+        auth
+    });
+
+    const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.SHEET_ID,
+        range: 'AtAGlance!A:A'
+    });
+
+    const rows = response.data.values || [];
+
+    return rows
+        .slice(1)           // Skip header
+        .map(row => row[0]) // First column only
+        .filter(Boolean);
+}
+
+async function getSpeciesProfile(species) {
+
+    const credentials = process.env.GOOGLE_CREDENTIALS_JSON
+        ? JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON)
+        : require('./google-credentials.json');
+
+    const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+
+    const sheets = google.sheets({
+        version: 'v4',
+        auth
+    });
+
+    const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.SHEET_ID,
+        range: 'AtAGlance!A:R'
+    });
+
+    const rows = response.data.values || [];
+
+    return rows
+        .slice(1)
+        .find(row =>
+            row[0]?.toLowerCase() === species.toLowerCase()
+        );
+}
+
 async function getOrphanSkins(species) {
     const credentials = process.env.GOOGLE_CREDENTIALS_JSON
         ? JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON)
@@ -123,6 +182,168 @@ const auth = new google.auth.GoogleAuth({
 }
 
 client.on('interactionCreate', async interaction => {
+
+    if (interaction.isAutocomplete()) {
+
+        if (interaction.commandName !== 'ataglance')
+            return;
+
+        const focused = interaction.options.getFocused();
+
+        const species = await getSpeciesList();
+
+        const filtered = species
+            .filter(s =>
+                s.toLowerCase().includes(focused.toLowerCase())
+            )
+            .slice(0, 25);
+
+        await interaction.respond(
+            filtered.map(s => ({
+                name: s,
+                value: s
+            }))
+        );
+
+        return;
+    }
+
+if (interaction.commandName === 'ataglance') {
+    await interaction.deferReply();
+
+    const species = interaction.options.getString('species');
+    const profile = await getSpeciesProfile(species);
+
+    if (!profile) {
+        return interaction.editReply({
+            content: `No field guide entry found for **${species}**.`
+        });
+    }
+
+    const profileLink = profile[1] || '';
+    const imageUrl = profile[2] || '';
+    const embedColor = profile[3] || '#D6A84F';
+
+    const diet = profile[4] || 'Not listed';
+    const tier = profile[5] || 'Not listed';
+    const activity = profile[6] || 'Not listed';
+
+    const maleDimorphism = profile[7] || 'Not listed';
+    const femaleDimorphism = profile[8] || 'Not listed';
+
+    const habitats = profile[9] || 'Not listed';
+    const nestingHabitats = profile[10] || 'Not listed';
+
+    const spring = profile[11] || '-';
+    const summer = profile[12] || '-';
+    const autumn = profile[13] || '-';
+    const winter = profile[14] || '-';
+
+    const grouping = profile[15] || 'Not listed';
+    const engagement = profile[16] || 'Not listed';
+
+    const rangers = profile[17] || 'Not listed';
+
+    const profileEmbed = new EmbedBuilder()
+    .setColor(embedColor)
+    .setTitle(`🧬 ${species}`)
+    .setDescription(
+        `🍽️ **${diet}** • 📶 **${tier}** • ⏰ **${activity}**`
+    )
+    .addFields(
+{
+    name: '<:Meteorite:1504809803791335517> ━━━━━━━━━━━━━━━━━━━ <:Meteorite:1504809803791335517>',
+    value: '\u200B',
+    inline: false
+},
+        {
+            name: '♂️ Male',
+            value: maleDimorphism,
+            inline: true
+        },
+        {
+            name: '♀️ Female',
+            value: femaleDimorphism,
+            inline: true
+        },
+        {
+            name: '\u200B',
+            value: '\u200B',
+            inline: true
+        },
+{
+    name: '<:Meteorite:1504809803791335517> ━━━━━━━━━━━━━━━━━━━ <:Meteorite:1504809803791335517>',
+    value: '\u200B',
+    inline: false
+},
+        {
+            name: '🌍 Habitats',
+            value: habitats,
+            inline: true
+        },
+        {
+            name: '🪺 Nesting Habitats',
+            value: nestingHabitats,
+            inline: true
+        },
+        {
+            name: ' Seasonal Egg Counts ',
+            value:
+            `🌸 **Spring:** ${spring}
+            ☀️ **Summer:** ${summer}
+            🍂 **Autumn:** ${autumn}
+            ❄️ **Winter:** ${winter}`,
+            inline: false
+        },
+{
+    name: '<:Meteorite:1504809803791335517> ━━━━━━━━━━━━━━━━━━━ <:Meteorite:1504809803791335517>',
+    value: '\u200B',
+    inline: false
+},
+        {
+            name: '👥 Grouping Limits',
+            value: grouping,
+            inline: true
+        },
+        {
+            name: '⚔️ Engagement Limits',
+            value: engagement,
+            inline: true
+        },
+        {
+            name: '\u200B',
+            value: '\u200B',
+            inline: true
+        },    )
+    .setFooter({
+        text: '<:Meteorite:1504809803791335517> Silent Valley Field Guide <:Meteorite:1504809803791335517>'
+    })
+    .setTimestamp();
+
+if (imageUrl) {
+    profileEmbed.setImage(imageUrl);
+}
+
+const components = [];
+
+if (profileLink) {
+    const profileButton = new ButtonBuilder()
+        .setLabel('📖 View Full Profile')
+        .setStyle(ButtonStyle.Link)
+        .setURL(profileLink);
+
+    const row = new ActionRowBuilder()
+        .addComponents(profileButton);
+
+    components.push(row);
+}
+
+await interaction.editReply({
+    embeds: [profileEmbed],
+    components
+});
+
+   }
 
 // Slash command: /orphan
 if (interaction.commandName === 'orphan') {
