@@ -316,7 +316,7 @@ if (interaction.commandName === 'ataglance') {
             inline: true
         },    )
     .setFooter({
-        text: '<:Meteorite:1504809803791335517> Silent Valley Field Guide <:Meteorite:1504809803791335517>'
+        text: 'Silent Valley Field Guide'
     })
     .setTimestamp();
 
