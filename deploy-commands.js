@@ -77,6 +77,11 @@ new SlashCommandBuilder()
             .setAutocomplete(true))
     .toJSON(),
 
+new SlashCommandBuilder()
+    .setName('apply')
+    .setDescription('Start your Silent Valley server application')
+    .toJSON(),
+
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);

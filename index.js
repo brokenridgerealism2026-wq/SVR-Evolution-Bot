@@ -14,7 +14,8 @@ const {
     ActionRowBuilder,
     EmbedBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    MessageFlags,
 } = require('discord.js');
 
 //==================================================//
@@ -170,7 +171,7 @@ const auth = new google.auth.GoogleAuth({
 
     const counts = {};
 
-    // skip header row
+// skip header row //
     for (const row of rows.slice(1)) {
         const discordId = row[1];
         const displayName = row[2];
@@ -192,6 +193,108 @@ const auth = new google.auth.GoogleAuth({
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
 }
+
+async function getApplicationQuestions() {
+    const credentials = process.env.GOOGLE_CREDENTIALS_JSON
+        ? JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON)
+        : require('./google-credentials.json');
+
+    const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+
+    const sheets = google.sheets({
+        version: 'v4',
+        auth
+    });
+
+    const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.SHEET_ID,
+        range: 'ApplicationQuestions!A:G'
+    });
+
+    const rows = response.data.values || [];
+
+    return rows.slice(1).map(row => ({
+        id: row[0],
+        section: row[1],
+        type: row[2],
+        question: row[3],
+        answer: row[4],
+        required: row[5],
+        active: row[6]
+    }));
+}
+
+//==================================================//
+//           APPLICATION HELPERS                    //
+//==================================================//
+
+function shuffleArray(array) {
+    return [...array].sort(() => Math.random() - 0.5);
+}
+
+function buildApplication(requiredQuestions, optionalQuestions) {
+
+    const selectedQuestions = shuffleArray(optionalQuestions)
+        .slice(0, APPLICATION_RANDOM_QUESTIONS);
+
+    return [
+        ...requiredQuestions,
+        ...chunkArray(selectedQuestions,5)
+    ];
+}
+
+function chunkArray(array, size) {
+    const chunks = [];
+
+    for (let i = 0; i < array.length; i += size) {
+        chunks.push(array.slice(i, i + size));
+    }
+
+    return chunks;
+}
+
+function buildApplicationModal(pageQuestions, pageNumber, totalPages) {
+
+    const modal = new ModalBuilder()
+        .setCustomId(`applicationPage_${pageNumber}`)
+        .setTitle(`Application • Page ${pageNumber + 1} of ${totalPages}`);
+
+    const rows = [];
+
+    pageQuestions.forEach((question, index) => {
+
+        const input = new TextInputBuilder()
+            .setCustomId(`question_${question.id}`)
+            .setLabel(question.question)
+            .setStyle(
+                question.type?.toLowerCase() === 'paragraph'
+                    ? TextInputStyle.Paragraph
+                    : TextInputStyle.Short
+            )
+            .setRequired(true);
+
+        rows.push(
+            new ActionRowBuilder().addComponents(input)
+        );
+    });
+
+    modal.addComponents(...rows);
+
+    return modal;
+}
+
+//==================================================//
+//                  BOT DATA                        //
+//==================================================//
+
+const APPLICATION_RANDOM_QUESTIONS = 18;
+
+const applicationSessions = new Map();
+
+const orphanLore = [];
 
 //==================================================//
 //               INTERACTION HANDLER                //
@@ -366,6 +469,46 @@ await interaction.editReply({
    }
 
 //==================================================//
+//                      /Apply                      //
+//==================================================//
+
+if (interaction.commandName === 'apply') {
+    const applyEmbed = new EmbedBuilder()
+        .setColor(0xD6A84F)
+        .setTitle('<:Meteorite:1504809803791335517> Silent Valley Entrance Examination <:Meteorite:1504809803791335517>')
+        .setDescription(
+            `Welcome to the Silent Valley application!\n\n` +
+            `Before you begin, please make sure:\n\n` +
+            `✅ You have thoroughly read the server rules.\n` +
+            `✅ You have your Alderon IGN + ID ready.\n` +
+            `✅ You have your Discord Name and ID ready.\n` +
+            `Your application will include:\n` +
+            `• Required identification and agreement questions\n` +
+            `• Randomly selected rule and realism questions\n\n` +
+            `Once submitted, your application will be reviewed by the staff team.\n\n` +
+            `Please answer honestly, thoroughly and thoughtfully.`
+        )
+        .setFooter({
+            text: 'Silent Valley Service Desk'
+        })
+        .setTimestamp();
+
+    const startButton = new ButtonBuilder()
+        .setCustomId(`startApplication_${interaction.user.id}`)
+        .setLabel('Begin Application')
+        .setStyle(ButtonStyle.Primary);
+
+    const row = new ActionRowBuilder()
+        .addComponents(startButton);
+
+    await interaction.reply({
+        embeds: [applyEmbed],
+        components: [row],
+        ephemeral: true
+    });
+}
+
+//==================================================//
 //                      /Orphan                     //
 //==================================================//
 
@@ -383,7 +526,7 @@ if (interaction.commandName === 'orphan') {
         });
     }
 
-    // Build weighted skin pool
+// Build weighted skin pool //
     const skinPool = [];
 
     for (const row of rows) {
@@ -396,11 +539,11 @@ if (interaction.commandName === 'orphan') {
         }
     }
 
-    // Roll dominant skin
+    // Roll dominant skin //
         const skin =
         skinPool[Math.floor(Math.random() * skinPool.length)];
 
-    // Roll 1 or 2 recessive skins from unique remaining skins
+    // Roll 1 or 2 recessive skins from unique remaining skins //
         const uniqueSkins = [...new Set(skinPool)];
 
         const recessivePool = uniqueSkins.filter(
@@ -424,11 +567,11 @@ if (recessivePool.length > 0) {
         }
     }
 }
-    // Roll pattern
+    // Roll pattern //
     const pattern =
         Math.floor(Math.random() * 3) + 1;
 
-    // Roll 6 colors (5 zones + eye color)
+    // Roll 6 colors (5 zones + eye color) //
     const colors = Array.from(
         { length: 6 },
         () => Math.floor(Math.random() * 5) + 1
@@ -494,7 +637,7 @@ if (interaction.commandName === 'skinrandomizer') {
     const motherEyes = interaction.options.getString('mother_eyes');
     const fatherEyes = interaction.options.getString('father_eyes');
 
-    // Build weighted skin pool
+    // Build weighted skin pool //
     const skinPool = [
         motherDominant,
         motherDominant,
@@ -535,14 +678,14 @@ if (interaction.commandName === 'skinrandomizer') {
     recessiveTwo = recessiveTwoPool[Math.floor(Math.random() * recessiveTwoPool.length)];
     }
 
-    // Roll eye color
+    // Roll eye color //
     const eyeColor =
         [motherEyes, fatherEyes][Math.floor(Math.random() * 2)];
 
-    // Roll pattern
+    // Roll pattern //
     const pattern = Math.floor(Math.random() * 3) + 1;
 
-    // Roll color zones
+    // Roll color zones //
     const colorZones = Array.from(
         { length: 5 },
         () => Math.floor(Math.random() * 5) + 1
@@ -662,7 +805,9 @@ if (interaction.commandName === 'leaderboard') {
         }
     }
 
-    // When user submits the form
+//==================================================//
+//          When User Submits the Form              //
+//==================================================//
     if (interaction.isModalSubmit()) {
     if (interaction.customId === 'evolutionSubmitModal') {
 
@@ -788,8 +933,85 @@ try {
 }
 }
 
-    // Button clicks
+//==================================================//
+//              Button Interactions                 //
+//==================================================//
+
     if (interaction.isButton()) {
+
+//========================//
+//              Start Application Button            //
+//=======================//
+
+if (interaction.customId.startsWith('startApplication_')) {
+    const applicantId = interaction.customId.split('_')[1];
+
+    if (interaction.user.id !== applicantId) {
+        return interaction.reply({
+            content: 'This application button is not for you.',
+            ephemeral: true
+        });
+    }
+
+    await interaction.update({
+        content: '<:Meteorite:1504809803791335517> Preparing your application...\n\nSelecting your questions from the Silent Valley archives... <:Meteorite:1504809803791335517>',
+        embeds: [],
+        components: []
+    });
+
+    // RESPONSE
+const questions = await getApplicationQuestions();
+
+const activeQuestions = questions.filter(q =>
+    q.active?.toLowerCase() === 'yes'
+);
+
+const requiredQuestions = activeQuestions.filter(q =>
+    q.required?.toLowerCase() === 'yes'
+);
+
+const optionalQuestions = activeQuestions.filter(q =>
+    q.required?.toLowerCase() !== 'yes'
+);
+
+const application = buildApplication(
+    requiredQuestions,
+    optionalQuestions
+);
+
+applicationSessions.set(interaction.user.id, {
+    currentPage: 0,
+    pages: application,
+    answers: {}
+});
+
+const session = applicationSessions.get(interaction.user.id);
+
+const modal = buildApplicationModal(
+    session.pages[0],
+    0,
+    session.pages.length
+);
+
+await interaction.followUp({
+    content: 'Your application is ready! Click below to begin.',
+    flags: MessageFlags.Ephemeral
+});
+
+const APPLICATION_RANDOM_QUESTIONS = 18;
+
+await interaction.followUp({
+    content:
+        `<:Meteorite:1504809803791335517> **Application Questions Loaded**\n\n` +
+        `✅ Required Questions: **${requiredQuestions.length}**\n` +
+        `📚 Optional Question Pool: **${optionalQuestions.length}**\n` +
+        `🎲 Selected **${APPLICATION_RANDOM_QUESTIONS}** random questions.\n\n` +
+        `📝 Total Questions: **${application.length}**`,
+    flags: MessageFlags.Ephemeral
+});
+
+    return;
+}
 
         const member = interaction.member;
 
@@ -876,7 +1098,12 @@ try {
     await interaction.showModal(denialModal);
 }
     }
-});
+            });
+
+//==================//
+//                    CRON JOBS                     //
+//=================//
+
 cron.schedule('0 14 * * *', async () => {
 
     console.log('Posting daily leaderboard...');
@@ -910,4 +1137,9 @@ cron.schedule('0 14 * * *', async () => {
     }
 
 });
+
+//=================//
+//                      LOGIN                       //
+//================//
+
 client.login(process.env.DISCORD_TOKEN);
