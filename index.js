@@ -297,9 +297,10 @@ function createApplicationSession(userId, pages) {
         answers: {}
     });
 
+    console.log('Created application session for', userId);
+
     return applicationSessions.get(userId);
 }
-
 //==================================================//
 //                  BOT DATA                        //
 //==================================================//
@@ -980,6 +981,12 @@ try {
 if (interaction.customId.startsWith('applicationPage_')) {
     const pageNumber = Number(interaction.customId.split('_')[1]);
     const session = applicationSessions.get(interaction.user.id);
+console.log(
+    'Submitted page',
+    pageNumber + 1,
+    'Session exists:',
+    !!session
+);
 
     if (!session) {
         return interaction.reply({
@@ -1117,6 +1124,12 @@ if (interaction.customId.startsWith('continueApplication_')) {
     }
 
     const session = applicationSessions.get(interaction.user.id);
+console.log(
+    'Continue button pressed by',
+    interaction.user.id,
+    'Session exists:',
+    !!session
+);
 
     if (!session) {
         return interaction.reply({
