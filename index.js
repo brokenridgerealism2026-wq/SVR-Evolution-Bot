@@ -1026,53 +1026,65 @@ console.log(
         });
     }
 
-    const reviewChannel = await client.channels.fetch(process.env.APPLICATION_REVIEW_CHANNEL_ID);
-
-const answerText = Object.values(session.answers)
-    .map((entry, index) =>
-        `**${index + 1}. ${entry.question}**\n` +
-        `**Answer:** ${entry.answer}\n` +
-        `**Official Answer:** ${entry.correctAnswer || 'Staff review required'}\n` +
-        `**Section:** ${entry.section}`
-    )
-    .join('\n\n');
-
-const applicationEmbed = new EmbedBuilder()
-    .setColor(0xD6A84F)
-    .setTitle('<:Meteorite:1504809803791335517> New Server Application <:Meteorite:1504809803791335517>')
-    .setDescription(`Application submitted by <@${interaction.user.id}>`)
-    .addFields(
-        {
-            name: 'Applicant',
-            value: `<@${interaction.user.id}>`,
-            inline: true
-        },
-        {
-            name: 'Discord ID',
-            value: interaction.user.id,
-            inline: true
-        },
-        {
-            name: 'Answers',
-            value: answerText.slice(0, 1024),
-            inline: false
-        }
-    )
-    .setFooter({
-        text: 'Silent Valley Application Review'
-    })
-    .setTimestamp();
-
-await reviewChannel.send({
-    embeds: [applicationEmbed]
-});
-
-applicationSessions.delete(interaction.user.id);
-
-return interaction.reply({
-    content: '✅ Your application has been submitted for staff review!',
+    await interaction.deferReply({
     flags: MessageFlags.Ephemeral
 });
+
+try {
+    const reviewChannel = await client.channels.fetch(process.env.APPLICATION_REVIEW_CHANNEL_ID);
+
+    const answerText = Object.values(session.answers)
+        .map((entry, index) =>
+            `**${index + 1}. ${entry.question}**\n` +
+            `**Answer:** ${entry.answer}\n` +
+            `**Official Answer:** ${entry.correctAnswer || 'Staff review required'}\n` +
+            `**Section:** ${entry.section}`
+        )
+        .join('\n\n');
+
+    const applicationEmbed = new EmbedBuilder()
+        .setColor(0xD6A84F)
+        .setTitle('<:Meteorite:1504809803791335517> New Server Application <:Meteorite:1504809803791335517>')
+        .setDescription(`Application submitted by <@${interaction.user.id}>`)
+        .addFields(
+            {
+                name: 'Applicant',
+                value: `<@${interaction.user.id}>`,
+                inline: true
+            },
+            {
+                name: 'Discord ID',
+                value: interaction.user.id,
+                inline: true
+            },
+            {
+                name: 'Answers',
+                value: answerText.slice(0, 1024) || 'No answers found.',
+                inline: false
+            }
+        )
+        .setFooter({
+            text: 'Silent Valley Application Review'
+        })
+        .setTimestamp();
+
+    await reviewChannel.send({
+        embeds: [applicationEmbed]
+    });
+
+    applicationSessions.delete(interaction.user.id);
+
+    return interaction.editReply({
+        content: '✅ Your application has been submitted for staff review!'
+    });
+
+} catch (error) {
+    console.error('Application submit failed:', error);
+
+    return interaction.editReply({
+        content: 'Something went wrong while submitting your application. Check the console log.'
+    });
+}
 }
 //==================================================//
 //              Button Interactions                 //
