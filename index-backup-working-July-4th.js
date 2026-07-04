@@ -1,7 +1,3 @@
-//==================================================//
-//                    IMPORTS                       //
-//==================================================//
-
 require('dotenv').config();
 const { google } = require('googleapis');
 const cron = require('node-cron');
@@ -17,10 +13,6 @@ const {
     ButtonStyle
 } = require('discord.js');
 
-//==================================================//
-//                  CLIENT SETUP                    //
-//==================================================//
-
 const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
@@ -28,10 +20,6 @@ const client = new Client({
 client.once('clientReady', () => {
     console.log(`Logged in as ${client.user.tag}`);
 });
-
-//==================================================//
-//             GOOGLE SHEETS HELPERS                //
-//==================================================//
 
 async function appendSubmissionToSheet(data) {
     const credentials = process.env.GOOGLE_CREDENTIALS_JSON
@@ -193,10 +181,6 @@ const auth = new google.auth.GoogleAuth({
         .slice(0, 10);
 }
 
-//==================================================//
-//               INTERACTION HANDLER                //
-//==================================================//
-
 client.on('interactionCreate', async interaction => {
 
     if (interaction.isAutocomplete()) {
@@ -223,10 +207,6 @@ client.on('interactionCreate', async interaction => {
 
         return;
     }
-
-//==================================================//
-//                   /AtAGlance                     //
-//==================================================//
 
 if (interaction.commandName === 'ataglance') {
     await interaction.deferReply();
@@ -365,10 +345,7 @@ await interaction.editReply({
 
    }
 
-//==================================================//
-//                      /Orphan                     //
-//==================================================//
-
+// Slash command: /orphan
 if (interaction.commandName === 'orphan') {
 
     await interaction.deferReply();
@@ -475,10 +452,7 @@ if (recessivePool.length > 0) {
 
 }
 
-//==================================================//
-//                /SkinRandomizer                   //
-//==================================================//
-
+// Slash command: /skinrandomizer
 if (interaction.commandName === 'skinrandomizer') {
 
     const motherDominant = interaction.options.getString('mother_dominant');
@@ -584,10 +558,7 @@ await interaction.reply({
 });
 }
 
-//==================================================//
-//                   /Leaderboard                   //
-//==================================================//
-
+// Slash command: /leaderboard
 if (interaction.commandName === 'leaderboard') {
     await interaction.deferReply();
 
@@ -616,10 +587,7 @@ if (interaction.commandName === 'leaderboard') {
 });
 }
 
-//==================================================//
-//                   /Standing                      //
-//==================================================//
-
+    // Slash command: /standing
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'standing') {
 
