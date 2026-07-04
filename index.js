@@ -1094,6 +1094,8 @@ if (interaction.customId.startsWith('startApplication_')) {
         });
     }
 
+await interaction.deferUpdate();
+
     const session = applicationSessions.get(interaction.user.id);
 
     if (!session) {
@@ -1109,8 +1111,21 @@ if (interaction.customId.startsWith('startApplication_')) {
         session.pages.length
     );
 
-    await interaction.showModal(modal);
-    return;
+    const openPageButton = new ButtonBuilder()
+    .setCustomId(`continueApplication_${interaction.user.id}`)
+    .setLabel('Open Page 1')
+    .setStyle(ButtonStyle.Primary);
+
+const row = new ActionRowBuilder()
+    .addComponents(openPageButton);
+
+await interaction.followUp({
+    content: '✅ Your application is ready. Click below to open Page 1.',
+    components: [row],
+    flags: MessageFlags.Ephemeral
+});
+
+return;
 }
 
 if (interaction.customId.startsWith('continueApplication_')) {
