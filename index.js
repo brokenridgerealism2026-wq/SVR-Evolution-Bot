@@ -345,7 +345,7 @@ client.on('interactionCreate', async interaction => {
 //                   /AtAGlance                     //
 //==================================================//
 
-if (interaction.commandName === 'ataglance') {
+if (interaction.isChatInputCommand() && interaction.commandName === 'ataglance') {
     await interaction.deferReply();
 
     const species = interaction.options.getString('species');
@@ -486,7 +486,10 @@ await interaction.editReply({
 //                      /Apply                      //
 //==================================================//
 
-if (interaction.commandName === 'apply') {
+if (interaction.isChatInputCommand() && interaction.commandName === 'apply') {
+await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+});
     const applyEmbed = new EmbedBuilder()
         .setColor(0xD6A84F)
         .setTitle('<:Meteorite:1504809803791335517> Silent Valley Entrance Examination <:Meteorite:1504809803791335517>')
@@ -507,6 +510,30 @@ if (interaction.commandName === 'apply') {
         })
         .setTimestamp();
 
+const questions = await getApplicationQuestions();
+
+const activeQuestions = questions.filter(q =>
+    q.active?.toLowerCase() === 'yes'
+);
+
+const requiredQuestions = activeQuestions.filter(q =>
+    q.required?.toLowerCase() === 'yes'
+);
+
+const optionalQuestions = activeQuestions.filter(q =>
+    q.required?.toLowerCase() !== 'yes'
+);
+
+const application = buildApplication(
+    requiredQuestions,
+    optionalQuestions
+);
+
+createApplicationSession(
+    interaction.user.id,
+    application
+);
+
     const startButton = new ButtonBuilder()
         .setCustomId(`startApplication_${interaction.user.id}`)
         .setLabel('Begin Application')
@@ -515,18 +542,18 @@ if (interaction.commandName === 'apply') {
     const row = new ActionRowBuilder()
         .addComponents(startButton);
 
-    await interaction.reply({
-        embeds: [applyEmbed],
-        components: [row],
-        ephemeral: true
-    });
-}
+    await interaction.editReply({
+    embeds: [applyEmbed],
+    components: [row]
+});
+    return;
+    }
 
 //==================================================//
 //                      /Orphan                     //
 //==================================================//
 
-if (interaction.commandName === 'orphan') {
+if (interaction.isChatInputCommand() && interaction.commandName === 'orphan') {
 
     await interaction.deferReply();
 
@@ -636,7 +663,7 @@ if (recessivePool.length > 0) {
 //                /SkinRandomizer                   //
 //==================================================//
 
-if (interaction.commandName === 'skinrandomizer') {
+if (interaction.isChatInputCommand() && interaction.commandName === 'skinrandomizer') {
 
     const motherDominant = interaction.options.getString('mother_dominant');
     const motherRecessive1 = interaction.options.getString('mother_recessive_1');
@@ -745,7 +772,7 @@ await interaction.reply({
 //                   /Leaderboard                   //
 //==================================================//
 
-if (interaction.commandName === 'leaderboard') {
+if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard') {
     await interaction.deferReply();
 
     const leaderboard = await getLeaderboardFromSheet();
@@ -778,7 +805,7 @@ if (interaction.commandName === 'leaderboard') {
 //==================================================//
 
     if (interaction.isChatInputCommand()) {
-        if (interaction.commandName === 'standing') {
+        if (interaction.isChatInputCommand() && interaction.commandName === 'Standing') {
 
             const modal = new ModalBuilder()
                 .setCustomId('evolutionSubmitModal')
@@ -866,7 +893,7 @@ if (interaction.commandName === 'leaderboard') {
 
         await interaction.reply({
             content: 'Your evolution submission has been sent for staff review!',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 
@@ -942,11 +969,61 @@ try {
 
     await interaction.editReply({
         content: 'Submission marked as not accepted. The reason was logged and I attempted to DM the user.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
     });
 }
 }
+//========================//
+//             Application Page Submit              //
+//=======================//
 
+if (interaction.customId.startsWith('applicationPage_')) {
+    const pageNumber = Number(interaction.customId.split('_')[1]);
+    const session = applicationSessions.get(interaction.user.id);
+
+    if (!session) {
+        return interaction.reply({
+            content: 'No active application session was found. Please run `/apply` again.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    const pageQuestions = session.pages[pageNumber];
+
+    for (const question of pageQuestions) {
+        const answer = interaction.fields.getTextInputValue(`question_${question.id}`);
+
+        session.answers[question.id] = {
+            question: question.question,
+            answer: answer,
+            correctAnswer: question.answer || '',
+            section: question.section || 'Unknown'
+        };
+    }
+
+    session.currentPage++;
+
+    if (session.currentPage < session.pages.length) {
+        const nextButton = new ButtonBuilder()
+            .setCustomId(`continueApplication_${interaction.user.id}`)
+            .setLabel(`Continue to Page ${session.currentPage + 1}`)
+            .setStyle(ButtonStyle.Primary);
+
+        const row = new ActionRowBuilder()
+            .addComponents(nextButton);
+
+        return interaction.reply({
+            content: `✅ Page ${pageNumber + 1} saved. Click below to continue.`,
+            components: [row],
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    return interaction.reply({
+        content: '✅ Application complete! Next step: send this to staff review.',
+        flags: MessageFlags.Ephemeral
+    });
+}
 //==================================================//
 //              Button Interactions                 //
 //==================================================//
@@ -963,44 +1040,55 @@ if (interaction.customId.startsWith('startApplication_')) {
     if (interaction.user.id !== applicantId) {
         return interaction.reply({
             content: 'This application button is not for you.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 
-    // RESPONSE
-const questions = await getApplicationQuestions();
+    const session = applicationSessions.get(interaction.user.id);
 
-const activeQuestions = questions.filter(q =>
-    q.active?.toLowerCase() === 'yes'
-);
+    if (!session) {
+        return interaction.reply({
+            content: 'No active application session was found. Please run `/apply` again.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
 
-const requiredQuestions = activeQuestions.filter(q =>
-    q.required?.toLowerCase() === 'yes'
-);
+    const modal = buildApplicationModal(
+        session.pages[0],
+        session.currentPage,
+        session.pages.length
+    );
 
-const optionalQuestions = activeQuestions.filter(q =>
-    q.required?.toLowerCase() !== 'yes'
-);
+    await interaction.showModal(modal);
+    return;
+}
 
-const application = buildApplication(
-    requiredQuestions,
-    optionalQuestions
-);
+if (interaction.customId.startsWith('continueApplication_')) {
+    const applicantId = interaction.customId.split('_')[1];
 
-const session = createApplicationSession(
-    interaction.user.id,
-    application
-);
+    if (interaction.user.id !== applicantId) {
+        return interaction.reply({
+            content: 'This application button is not for you.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
 
-const modal = buildApplicationModal(
-    session.pages[0],
-    session.currentPage,
-    session.pages.length
-);
+    const session = applicationSessions.get(interaction.user.id);
 
-await interaction.showModal(modal);
+    if (!session) {
+        return interaction.reply({
+            content: 'No active application session was found. Please run `/apply` again.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
 
-return;
+    const modal = buildApplicationModal(
+        session.pages[session.currentPage],
+        session.currentPage,
+        session.pages.length
+    );
+
+    return interaction.showModal(modal);
 }
         const member = interaction.member;
 
@@ -1013,7 +1101,7 @@ const hasAllowedRole = allowedRoleIds.some(roleId =>
 if (!hasAllowedRole) {
             return interaction.reply({
                 content: 'You do not have permission to review submissions.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -1085,9 +1173,9 @@ try {
     );
 
     await interaction.showModal(denialModal);
-}
+        }
     }
-            });
+});
 
 //==================//
 //                    CRON JOBS                     //
