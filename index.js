@@ -1094,40 +1094,48 @@ if (interaction.customId.startsWith('startApplication_')) {
         });
     }
 
-await interaction.deferUpdate();
+    await interaction.deferUpdate();
 
-    const session = applicationSessions.get(interaction.user.id);
+    const questions = await getApplicationQuestions();
 
-    if (!session) {
-        return interaction.reply({
-            content: 'No active application session was found. Please run `/apply` again.',
-            flags: MessageFlags.Ephemeral
-        });
-    }
+    const activeQuestions = questions.filter(q =>
+        q.active?.toLowerCase() === 'yes'
+    );
 
-    const modal = buildApplicationModal(
-        session.pages[0],
-        session.currentPage,
-        session.pages.length
+    const requiredQuestions = activeQuestions.filter(q =>
+        q.required?.toLowerCase() === 'yes'
+    );
+
+    const optionalQuestions = activeQuestions.filter(q =>
+        q.required?.toLowerCase() !== 'yes'
+    );
+
+    const application = buildApplication(
+        requiredQuestions,
+        optionalQuestions
+    );
+
+    createApplicationSession(
+        interaction.user.id,
+        application
     );
 
     const openPageButton = new ButtonBuilder()
-    .setCustomId(`continueApplication_${interaction.user.id}`)
-    .setLabel('Open Page 1')
-    .setStyle(ButtonStyle.Primary);
+        .setCustomId(`continueApplication_${interaction.user.id}`)
+        .setLabel('Open Page 1')
+        .setStyle(ButtonStyle.Primary);
 
-const row = new ActionRowBuilder()
-    .addComponents(openPageButton);
+    const row = new ActionRowBuilder()
+        .addComponents(openPageButton);
 
-await interaction.followUp({
-    content: '✅ Your application is ready. Click below to open Page 1.',
-    components: [row],
-    flags: MessageFlags.Ephemeral
-});
+    await interaction.followUp({
+        content: '✅ Your application is ready. Click below to open Page 1.',
+        components: [row],
+        flags: MessageFlags.Ephemeral
+    });
 
-return;
+    return;
 }
-
 if (interaction.customId.startsWith('continueApplication_')) {
     const applicantId = interaction.customId.split('_')[1];
 
