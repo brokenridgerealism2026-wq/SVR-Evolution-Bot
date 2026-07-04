@@ -236,14 +236,13 @@ function shuffleArray(array) {
 }
 
 function buildApplication(requiredQuestions, optionalQuestions) {
-
     const selectedQuestions = shuffleArray(optionalQuestions)
         .slice(0, APPLICATION_RANDOM_QUESTIONS);
 
-    return [
-        ...requiredQuestions,
-        ...chunkArray(selectedQuestions,5)
-    ];
+return [
+    requiredQuestions,
+    ...chunkArray(selectedQuestions, 5)
+];
 }
 
 function chunkArray(array, size) {
@@ -268,7 +267,11 @@ function buildApplicationModal(pageQuestions, pageNumber, totalPages) {
 
         const input = new TextInputBuilder()
             .setCustomId(`question_${question.id}`)
-            .setLabel(question.question)
+            .setLabel(
+                question.question.length > 45
+                    ? question.question.slice(0, 42) + '...'
+                    : question.question
+            )
             .setStyle(
                 question.type?.toLowerCase() === 'paragraph'
                     ? TextInputStyle.Paragraph
@@ -284,6 +287,17 @@ function buildApplicationModal(pageQuestions, pageNumber, totalPages) {
     modal.addComponents(...rows);
 
     return modal;
+}
+
+function createApplicationSession(userId, pages) {
+
+    applicationSessions.set(userId, {
+        currentPage: 0,
+        pages,
+        answers: {}
+    });
+
+    return applicationSessions.get(userId);
 }
 
 //==================================================//
@@ -953,12 +967,6 @@ if (interaction.customId.startsWith('startApplication_')) {
         });
     }
 
-    await interaction.update({
-        content: '<:Meteorite:1504809803791335517> Preparing your application...\n\nSelecting your questions from the Silent Valley archives... <:Meteorite:1504809803791335517>',
-        embeds: [],
-        components: []
-    });
-
     // RESPONSE
 const questions = await getApplicationQuestions();
 
@@ -979,40 +987,21 @@ const application = buildApplication(
     optionalQuestions
 );
 
-applicationSessions.set(interaction.user.id, {
-    currentPage: 0,
-    pages: application,
-    answers: {}
-});
-
-const session = applicationSessions.get(interaction.user.id);
+const session = createApplicationSession(
+    interaction.user.id,
+    application
+);
 
 const modal = buildApplicationModal(
     session.pages[0],
-    0,
+    session.currentPage,
     session.pages.length
 );
 
-await interaction.followUp({
-    content: 'Your application is ready! Click below to begin.',
-    flags: MessageFlags.Ephemeral
-});
+await interaction.showModal(modal);
 
-const APPLICATION_RANDOM_QUESTIONS = 18;
-
-await interaction.followUp({
-    content:
-        `<:Meteorite:1504809803791335517> **Application Questions Loaded**\n\n` +
-        `✅ Required Questions: **${requiredQuestions.length}**\n` +
-        `📚 Optional Question Pool: **${optionalQuestions.length}**\n` +
-        `🎲 Selected **${APPLICATION_RANDOM_QUESTIONS}** random questions.\n\n` +
-        `📝 Total Questions: **${application.length}**`,
-    flags: MessageFlags.Ephemeral
-});
-
-    return;
+return;
 }
-
         const member = interaction.member;
 
         const allowedRoleIds = process.env.STAFF_ROLE_IDS.split(',');
