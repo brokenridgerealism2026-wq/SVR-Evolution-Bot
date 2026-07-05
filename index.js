@@ -204,6 +204,8 @@ const auth = new google.auth.GoogleAuth({
 
 const applicationSessions = new Map();
 
+const processedDmMessages = new Set();
+
 //======================//
 // Test Questions       //
 //======================//
@@ -254,6 +256,10 @@ client.on('messageCreate', async message => {
 
     if (message.author.bot) return;
     if (message.guild) return;
+    if (processedDmMessages.has(message.id)) return;
+        processedDmMessages.add(message.id);
+
+    console.log('DM received from', message.author.id, ':', message.content);
 
     const session = applicationSessions.get(message.author.id);
 
