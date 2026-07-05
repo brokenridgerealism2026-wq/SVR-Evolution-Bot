@@ -14,7 +14,8 @@ const {
     EmbedBuilder,
     ButtonBuilder,
     ButtonStyle,
-    MessageFlags
+    MessageFlags,
+    Partials
 } = require('discord.js');
 
 //==================================================//
@@ -22,7 +23,12 @@ const {
 //==================================================//
 
 const client = new Client({
-    intents: [GatewayIntentBits.Guilds]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.MessageContent
+    ],
+    partials: [Partials.Channel]
 });
 
 client.once('clientReady', () => {
@@ -239,6 +245,34 @@ client.on('interactionCreate', async interaction => {
 
         return;
     }
+
+//======================//
+// DM Message Handler   //
+//======================//
+
+client.on('messageCreate', async message => {
+
+    if (message.author.bot) return;
+    if (message.guild) return;
+
+    const session = applicationSessions.get(message.author.id);
+
+    if (!session) return;
+
+    const question = demoQuestions[session.currentQuestion];
+
+    session.answers.push({
+        question: question.question,
+        section: question.section,
+        answer: message.content
+    });
+
+    await message.reply(
+        "✅ Answer saved!\n\n" +
+        `You answered:\n> ${message.content}`
+    );
+
+});
 
 //==================================================//
 //                   /AtAGlance                     //
@@ -854,24 +888,28 @@ if (interaction.isButton()) {
     //==============================//
 
     if (interaction.customId.startsWith('startSimpleApplication_')) {
-        const applicantId = interaction.customId.split('_')[1];
+    const applicantId = interaction.customId.split('_')[1];
 
-        if (interaction.user.id !== applicantId) {
-            return interaction.reply({
-                content: 'This application button is not for you.',
-                flags: MessageFlags.Ephemeral
-            });
-        }
+    if (interaction.user.id !== applicantId) {
+        return interaction.reply({
+            content: 'This application button is not for you.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
 
-        try {
-
-    applicationSessions.set(interaction.user.id, {
-        currentQuestion: 0,
-        answers: []
+    await interaction.reply({
+        content: '📬 Opening your application file...',
+        flags: MessageFlags.Ephemeral
     });
 
-    await interaction.user.send(
-        `🌠 **Silent Valley Entrance Examination**
+    try {
+        applicationSessions.set(interaction.user.id, {
+            currentQuestion: 0,
+            answers: []
+        });
+
+        await interaction.user.send(
+            `🌠 **Silent Valley Entrance Examination**
 
 Welcome!
 
@@ -880,12 +918,12 @@ Thank you for applying to Silent Valley.
 Let's begin!
 
 ━━━━━━━━━━━━━━━━━━━━━━`
-    );
+        );
 
-    const question = demoQuestions[0];
+        const question = demoQuestions[0];
 
-    await interaction.user.send(
-        `━━━━━━━━━━━━━━━━━━━━━━
+        await interaction.user.send(
+            `━━━━━━━━━━━━━━━━━━━━━━
 
 <:Meteorite:1504809803791335517> **Silent Valley Office** <:Meteorite:1504809803791335517>
 
@@ -898,22 +936,22 @@ Let's begin!
 ━━━━━━━━━━━━━━━━━━━━━━
 
 Reply with your answer below.`
-    );
+        );
 
-    await interaction.reply({
-        content: "📬 I've sent you a DM to begin your application!",
-        flags: MessageFlags.Ephemeral
-    });
+        await interaction.editReply({
+            content: "📬 I've sent you a DM to begin your application!"
+        });
 
-} catch {
-            await interaction.reply({
-                content: "❌ I couldn't send you a DM.\n\nPlease enable Direct Messages from server members and try again.",
-                flags: MessageFlags.Ephemeral
-            });
-        }
+    } catch (error) {
+        console.error('Application DM failed:', error);
 
-        return;
+        await interaction.editReply({
+            content: "❌ I couldn't send you a DM.\n\nPlease enable Direct Messages from server members and try again."
+        });
     }
+
+    return;
+}
     //==============================//
     // Evolution Review Buttons     //
     //==============================//
