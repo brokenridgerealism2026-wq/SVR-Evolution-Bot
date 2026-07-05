@@ -1,7 +1,6 @@
 //==================================================//
 //                    IMPORTS                       //
 //==================================================//
-
 require('dotenv').config();
 const { google } = require('googleapis');
 const cron = require('node-cron');
@@ -14,8 +13,7 @@ const {
     ActionRowBuilder,
     EmbedBuilder,
     ButtonBuilder,
-    ButtonStyle,
-    MessageFlags,
+    ButtonStyle
 } = require('discord.js');
 
 //==================================================//
@@ -171,7 +169,7 @@ const auth = new google.auth.GoogleAuth({
 
     const counts = {};
 
-// skip header row //
+    // skip header row
     for (const row of rows.slice(1)) {
         const discordId = row[1];
         const displayName = row[2];
@@ -193,123 +191,6 @@ const auth = new google.auth.GoogleAuth({
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
 }
-
-async function getApplicationQuestions() {
-    const credentials = process.env.GOOGLE_CREDENTIALS_JSON
-        ? JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON)
-        : require('./google-credentials.json');
-
-    const auth = new google.auth.GoogleAuth({
-        credentials,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets']
-    });
-
-    const sheets = google.sheets({
-        version: 'v4',
-        auth
-    });
-
-    const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: process.env.SHEET_ID,
-        range: 'ApplicationQuestions!A:G'
-    });
-
-    const rows = response.data.values || [];
-
-    return rows.slice(1).map(row => ({
-        id: row[0],
-        section: row[1],
-        type: row[2],
-        question: row[3],
-        answer: row[4],
-        required: row[5],
-        active: row[6]
-    }));
-}
-
-//==================================================//
-//           APPLICATION HELPERS                    //
-//==================================================//
-
-function shuffleArray(array) {
-    return [...array].sort(() => Math.random() - 0.5);
-}
-
-function buildApplication(requiredQuestions, optionalQuestions) {
-    const selectedQuestions = shuffleArray(optionalQuestions)
-        .slice(0, APPLICATION_RANDOM_QUESTIONS);
-
-return [
-    requiredQuestions,
-    ...chunkArray(selectedQuestions, 5)
-];
-}
-
-function chunkArray(array, size) {
-    const chunks = [];
-
-    for (let i = 0; i < array.length; i += size) {
-        chunks.push(array.slice(i, i + size));
-    }
-
-    return chunks;
-}
-
-function buildApplicationModal(pageQuestions, pageNumber, totalPages) {
-
-    const modal = new ModalBuilder()
-        .setCustomId(`applicationPage_${pageNumber}`)
-        .setTitle(`Application • Page ${pageNumber + 1} of ${totalPages}`);
-
-    const rows = [];
-
-    pageQuestions.forEach((question, index) => {
-
-        const input = new TextInputBuilder()
-            .setCustomId(`question_${question.id}`)
-            .setLabel(
-                question.question.length > 45
-                    ? question.question.slice(0, 42) + '...'
-                    : question.question
-            )
-            .setStyle(
-                question.type?.toLowerCase() === 'paragraph'
-                    ? TextInputStyle.Paragraph
-                    : TextInputStyle.Short
-            )
-            .setRequired(true);
-
-        rows.push(
-            new ActionRowBuilder().addComponents(input)
-        );
-    });
-
-    modal.addComponents(...rows);
-
-    return modal;
-}
-
-function createApplicationSession(userId, pages) {
-
-    applicationSessions.set(userId, {
-        currentPage: 0,
-        pages,
-        answers: {}
-    });
-
-    console.log('Created application session for', userId);
-
-    return applicationSessions.get(userId);
-}
-//==================================================//
-//                  BOT DATA                        //
-//==================================================//
-
-const APPLICATION_RANDOM_QUESTIONS = 18;
-
-const applicationSessions = new Map();
-
-const orphanLore = [];
 
 //==================================================//
 //               INTERACTION HANDLER                //
@@ -344,9 +225,8 @@ client.on('interactionCreate', async interaction => {
 
 //==================================================//
 //                   /AtAGlance                     //
-//==================================================//
-
-if (interaction.isChatInputCommand() && interaction.commandName === 'ataglance') {
+//==================================================/
+if (interaction.commandName === 'ataglance') {
     await interaction.deferReply();
 
     const species = interaction.options.getString('species');
@@ -484,77 +364,10 @@ await interaction.editReply({
    }
 
 //==================================================//
-//                      /Apply                      //
-//==================================================//
-
-if (interaction.isChatInputCommand() && interaction.commandName === 'apply') {
-await interaction.deferReply({
-    flags: MessageFlags.Ephemeral
-});
-    const applyEmbed = new EmbedBuilder()
-        .setColor(0xD6A84F)
-        .setTitle('<:Meteorite:1504809803791335517> Silent Valley Entrance Examination <:Meteorite:1504809803791335517>')
-        .setDescription(
-            `Welcome to the Silent Valley application!\n\n` +
-            `Before you begin, please make sure:\n\n` +
-            `✅ You have thoroughly read the server rules.\n` +
-            `✅ You have your Alderon IGN + ID ready.\n` +
-            `✅ You have your Discord Name and ID ready.\n` +
-            `Your application will include:\n` +
-            `• Required identification and agreement questions\n` +
-            `• Randomly selected rule and realism questions\n\n` +
-            `Once submitted, your application will be reviewed by the staff team.\n\n` +
-            `Please answer honestly, thoroughly and thoughtfully.`
-        )
-        .setFooter({
-            text: 'Silent Valley Service Desk'
-        })
-        .setTimestamp();
-
-const questions = await getApplicationQuestions();
-
-const activeQuestions = questions.filter(q =>
-    q.active?.toLowerCase() === 'yes'
-);
-
-const requiredQuestions = activeQuestions.filter(q =>
-    q.required?.toLowerCase() === 'yes'
-);
-
-const optionalQuestions = activeQuestions.filter(q =>
-    q.required?.toLowerCase() !== 'yes'
-);
-
-const application = buildApplication(
-    requiredQuestions,
-    optionalQuestions
-);
-
-createApplicationSession(
-    interaction.user.id,
-    application
-);
-
-    const startButton = new ButtonBuilder()
-        .setCustomId(`startApplication_${interaction.user.id}`)
-        .setLabel('Begin Application')
-        .setStyle(ButtonStyle.Primary);
-
-    const row = new ActionRowBuilder()
-        .addComponents(startButton);
-
-    await interaction.editReply({
-    embeds: [applyEmbed],
-    components: [row]
-});
-    return;
-    }
-
-//==================================================//
 //                      /Orphan                     //
 //==================================================//
 
-if (interaction.isChatInputCommand() && interaction.commandName === 'orphan') {
+if (interaction.commandName === 'orphan') {
 
     await interaction.deferReply();
 
@@ -568,7 +381,7 @@ if (interaction.isChatInputCommand() && interaction.commandName === 'orphan') {
         });
     }
 
-// Build weighted skin pool //
+    // Build weighted skin pool
     const skinPool = [];
 
     for (const row of rows) {
@@ -581,11 +394,11 @@ if (interaction.isChatInputCommand() && interaction.commandName === 'orphan') {
         }
     }
 
-    // Roll dominant skin //
+    // Roll dominant skin
         const skin =
         skinPool[Math.floor(Math.random() * skinPool.length)];
 
-    // Roll 1 or 2 recessive skins from unique remaining skins //
+    // Roll 1 or 2 recessive skins from unique remaining skins
         const uniqueSkins = [...new Set(skinPool)];
 
         const recessivePool = uniqueSkins.filter(
@@ -609,11 +422,11 @@ if (recessivePool.length > 0) {
         }
     }
 }
-    // Roll pattern //
+    // Roll pattern
     const pattern =
         Math.floor(Math.random() * 3) + 1;
 
-    // Roll 6 colors (5 zones + eye color) //
+    // Roll 6 colors (5 zones + eye color)
     const colors = Array.from(
         { length: 6 },
         () => Math.floor(Math.random() * 5) + 1
@@ -664,7 +477,7 @@ if (recessivePool.length > 0) {
 //                /SkinRandomizer                   //
 //==================================================//
 
-if (interaction.isChatInputCommand() && interaction.commandName === 'skinrandomizer') {
+if (interaction.commandName === 'skinrandomizer') {
 
     const motherDominant = interaction.options.getString('mother_dominant');
     const motherRecessive1 = interaction.options.getString('mother_recessive_1');
@@ -679,7 +492,7 @@ if (interaction.isChatInputCommand() && interaction.commandName === 'skinrandomi
     const motherEyes = interaction.options.getString('mother_eyes');
     const fatherEyes = interaction.options.getString('father_eyes');
 
-    // Build weighted skin pool //
+    // Build weighted skin pool
     const skinPool = [
         motherDominant,
         motherDominant,
@@ -720,14 +533,14 @@ if (interaction.isChatInputCommand() && interaction.commandName === 'skinrandomi
     recessiveTwo = recessiveTwoPool[Math.floor(Math.random() * recessiveTwoPool.length)];
     }
 
-    // Roll eye color //
+    // Roll eye color
     const eyeColor =
         [motherEyes, fatherEyes][Math.floor(Math.random() * 2)];
 
-    // Roll pattern //
+    // Roll pattern
     const pattern = Math.floor(Math.random() * 3) + 1;
 
-    // Roll color zones //
+    // Roll color zones
     const colorZones = Array.from(
         { length: 5 },
         () => Math.floor(Math.random() * 5) + 1
@@ -769,11 +582,10 @@ await interaction.reply({
 });
 }
 
-//==================================================//
+//====================//
 //                   /Leaderboard                   //
-//==================================================//
-
-if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard') {
+//===================//
+if (interaction.commandName === 'leaderboard') {
     await interaction.deferReply();
 
     const leaderboard = await getLeaderboardFromSheet();
@@ -801,12 +613,11 @@ if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard
 });
 }
 
-//==================================================//
+//==================//
 //                   /Standing                      //
-//==================================================//
-
+//==================//
     if (interaction.isChatInputCommand()) {
-        if (interaction.isChatInputCommand() && interaction.commandName === 'Standing') {
+        if (interaction.commandName === 'standing') {
 
             const modal = new ModalBuilder()
                 .setCustomId('evolutionSubmitModal')
@@ -847,9 +658,7 @@ if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard
         }
     }
 
-//==================================================//
-//          When User Submits the Form              //
-//==================================================//
+// When user submits the form //
     if (interaction.isModalSubmit()) {
     if (interaction.customId === 'evolutionSubmitModal') {
 
@@ -894,7 +703,7 @@ if (interaction.isChatInputCommand() && interaction.commandName === 'leaderboard
 
         await interaction.reply({
             content: 'Your evolution submission has been sent for staff review!',
-            flags: MessageFlags.Ephemeral
+            ephemeral: true
         });
     }
 
@@ -970,217 +779,16 @@ try {
 
     await interaction.editReply({
         content: 'Submission marked as not accepted. The reason was logged and I attempted to DM the user.',
-        flags: MessageFlags.Ephemeral
+        ephemeral: true
     });
 }
 }
-//========================//
-//             Application Page Submit              //
-//=======================//
 
-if (interaction.customId.startsWith('applicationPage_')) {
-    const pageNumber = Number(interaction.customId.split('_')[1]);
-    const session = applicationSessions.get(interaction.user.id);
-console.log(
-    'Submitted page',
-    pageNumber + 1,
-    'Session exists:',
-    !!session
-);
-
-    if (!session) {
-        return interaction.reply({
-            content: 'No active application session was found. Please run `/apply` again.',
-            flags: MessageFlags.Ephemeral
-        });
-    }
-
-    const pageQuestions = session.pages[pageNumber];
-
-    for (const question of pageQuestions) {
-        const answer = interaction.fields.getTextInputValue(`question_${question.id}`);
-
-        session.answers[question.id] = {
-            question: question.question,
-            answer: answer,
-            correctAnswer: question.answer || '',
-            section: question.section || 'Unknown'
-        };
-    }
-
-    session.currentPage++;
-
-    if (session.currentPage < session.pages.length) {
-        const nextButton = new ButtonBuilder()
-            .setCustomId(`continueApplication_${interaction.user.id}`)
-            .setLabel(`Continue to Page ${session.currentPage + 1}`)
-            .setStyle(ButtonStyle.Primary);
-
-        const row = new ActionRowBuilder()
-            .addComponents(nextButton);
-
-        return interaction.reply({
-            content: `✅ Page ${pageNumber + 1} saved. Click below to continue.`,
-            components: [row],
-            flags: MessageFlags.Ephemeral
-        });
-    }
-
-    await interaction.deferReply({
-    flags: MessageFlags.Ephemeral
-});
-
-try {
-    const reviewChannel = await client.channels.fetch(process.env.APPLICATION_REVIEW_CHANNEL_ID);
-
-    const answerText = Object.values(session.answers)
-        .map((entry, index) =>
-            `**${index + 1}. ${entry.question}**\n` +
-            `**Answer:** ${entry.answer}\n` +
-            `**Official Answer:** ${entry.correctAnswer || 'Staff review required'}\n` +
-            `**Section:** ${entry.section}`
-        )
-        .join('\n\n');
-
-    const applicationEmbed = new EmbedBuilder()
-        .setColor(0xD6A84F)
-        .setTitle('<:Meteorite:1504809803791335517> New Server Application <:Meteorite:1504809803791335517>')
-        .setDescription(`Application submitted by <@${interaction.user.id}>`)
-        .addFields(
-            {
-                name: 'Applicant',
-                value: `<@${interaction.user.id}>`,
-                inline: true
-            },
-            {
-                name: 'Discord ID',
-                value: interaction.user.id,
-                inline: true
-            },
-            {
-                name: 'Answers',
-                value: answerText.slice(0, 1024) || 'No answers found.',
-                inline: false
-            }
-        )
-        .setFooter({
-            text: 'Silent Valley Application Review'
-        })
-        .setTimestamp();
-
-    await reviewChannel.send({
-        embeds: [applicationEmbed]
-    });
-
-    applicationSessions.delete(interaction.user.id);
-
-    return interaction.editReply({
-        content: '✅ Your application has been submitted for staff review!'
-    });
-
-} catch (error) {
-    console.error('Application submit failed:', error);
-
-    return interaction.editReply({
-        content: 'Something went wrong while submitting your application. Check the console log.'
-    });
-}
-}
-//==================================================//
+//======================//
 //              Button Interactions                 //
-//==================================================//
-
+//======================//
     if (interaction.isButton()) {
 
-//========================//
-//              Start Application Button            //
-//=======================//
-
-if (interaction.customId.startsWith('startApplication_')) {
-    const applicantId = interaction.customId.split('_')[1];
-
-    if (interaction.user.id !== applicantId) {
-        return interaction.reply({
-            content: 'This application button is not for you.',
-            flags: MessageFlags.Ephemeral
-        });
-    }
-
-    await interaction.deferUpdate();
-
-    const questions = await getApplicationQuestions();
-
-    const activeQuestions = questions.filter(q =>
-        q.active?.toLowerCase() === 'yes'
-    );
-
-    const requiredQuestions = activeQuestions.filter(q =>
-        q.required?.toLowerCase() === 'yes'
-    );
-
-    const optionalQuestions = activeQuestions.filter(q =>
-        q.required?.toLowerCase() !== 'yes'
-    );
-
-    const application = buildApplication(
-        requiredQuestions,
-        optionalQuestions
-    );
-
-    createApplicationSession(
-        interaction.user.id,
-        application
-    );
-
-    const openPageButton = new ButtonBuilder()
-        .setCustomId(`continueApplication_${interaction.user.id}`)
-        .setLabel('Open Page 1')
-        .setStyle(ButtonStyle.Primary);
-
-    const row = new ActionRowBuilder()
-        .addComponents(openPageButton);
-
-    await interaction.followUp({
-        content: '✅ Your application is ready. Click below to open Page 1.',
-        components: [row],
-        flags: MessageFlags.Ephemeral
-    });
-
-    return;
-}
-if (interaction.customId.startsWith('continueApplication_')) {
-    const applicantId = interaction.customId.split('_')[1];
-
-    if (interaction.user.id !== applicantId) {
-        return interaction.reply({
-            content: 'This application button is not for you.',
-            flags: MessageFlags.Ephemeral
-        });
-    }
-
-    const session = applicationSessions.get(interaction.user.id);
-console.log(
-    'Continue button pressed by',
-    interaction.user.id,
-    'Session exists:',
-    !!session
-);
-
-    if (!session) {
-        return interaction.reply({
-            content: 'No active application session was found. Please run `/apply` again.',
-            flags: MessageFlags.Ephemeral
-        });
-    }
-
-    const modal = buildApplicationModal(
-        session.pages[session.currentPage],
-        session.currentPage,
-        session.pages.length
-    );
-
-    return interaction.showModal(modal);
-}
         const member = interaction.member;
 
         const allowedRoleIds = process.env.STAFF_ROLE_IDS.split(',');
@@ -1192,7 +800,7 @@ const hasAllowedRole = allowedRoleIds.some(roleId =>
 if (!hasAllowedRole) {
             return interaction.reply({
                 content: 'You do not have permission to review submissions.',
-                flags: MessageFlags.Ephemeral
+                ephemeral: true
             });
         }
 
@@ -1264,7 +872,7 @@ try {
     );
 
     await interaction.showModal(denialModal);
-        }
+}
     }
 });
 
@@ -1303,11 +911,9 @@ cron.schedule('0 14 * * *', async () => {
     } catch (error) {
         console.error(error);
     }
-
-});
-
 //=================//
 //                      LOGIN                       //
 //================//
 
+});
 client.login(process.env.DISCORD_TOKEN);
