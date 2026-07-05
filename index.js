@@ -13,7 +13,8 @@ const {
     ActionRowBuilder,
     EmbedBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    MessageFlags
 } = require('discord.js');
 
 //==================================================//
@@ -583,7 +584,7 @@ await interaction.reply({
 }
 
 //====================//
-//                   /Leaderboard                   //
+//    /Leaderboard    //
 //===================//
 if (interaction.commandName === 'leaderboard') {
     await interaction.deferReply();
@@ -614,7 +615,7 @@ if (interaction.commandName === 'leaderboard') {
 }
 
 //==================//
-//                   /Standing                      //
+//    /Standing     //
 //==================//
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'standing') {
@@ -660,6 +661,17 @@ if (interaction.commandName === 'leaderboard') {
 
 // When user submits the form //
     if (interaction.isModalSubmit()) {
+        if (interaction.customId === 'simpleApplication') {
+
+    const name = interaction.fields.getTextInputValue('discordName');
+
+    await interaction.reply({
+        content: `Success! You entered **${name}**`,
+        flags: MessageFlags.Ephemeral
+    });
+
+    return;
+}
     if (interaction.customId === 'evolutionSubmitModal') {
 
         const species = interaction.fields.getTextInputValue('species');
@@ -703,7 +715,7 @@ if (interaction.commandName === 'leaderboard') {
 
         await interaction.reply({
             content: 'Your evolution submission has been sent for staff review!',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
         });
     }
 
@@ -711,7 +723,7 @@ if (interaction.commandName === 'leaderboard') {
     const submittedUserId = interaction.customId.split('_')[1];
     const denialReason = interaction.fields.getTextInputValue('denialReason');
     
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const message = interaction.message;
     const oldEmbed = message.embeds[0];
@@ -779,13 +791,44 @@ try {
 
     await interaction.editReply({
         content: 'Submission marked as not accepted. The reason was logged and I attempted to DM the user.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
     });
 }
 }
 
+//==================================================//
+//                      /Apply                      //
+//==================================================//
+
+if (interaction.commandName === 'apply') {
+    const applyEmbed = new EmbedBuilder()
+        .setColor(0xD6A84F)
+        .setTitle('<:Meteorite:1504809803791335517> Silent Valley Application <:Meteorite:1504809803791335517>')
+        .setDescription(
+            `Welcome to the Silent Valley application.\n\n` +
+            `Click the button below to begin.`
+        )
+        .setFooter({ text: 'Silent Valley Service Desk' })
+        .setTimestamp();
+
+    const startButton = new ButtonBuilder()
+        .setCustomId(`startSimpleApplication_${interaction.user.id}`)
+        .setLabel('Begin Application')
+        .setStyle(ButtonStyle.Primary);
+
+    const row = new ActionRowBuilder().addComponents(startButton);
+
+    await interaction.reply({
+        embeds: [applyEmbed],
+        components: [row],
+        flags: MessageFlags.Ephemeral
+    });
+
+    return;
+}
+
 //======================//
-//              Button Interactions                 //
+// Button Interactions  //
 //======================//
     if (interaction.isButton()) {
 
@@ -800,7 +843,7 @@ const hasAllowedRole = allowedRoleIds.some(roleId =>
 if (!hasAllowedRole) {
             return interaction.reply({
                 content: 'You do not have permission to review submissions.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -856,6 +899,34 @@ try {
             });
         }
 
+        if (interaction.customId.startsWith('startSimpleApplication_')) {
+
+    const applicantId = interaction.customId.split('_')[1];
+
+    if (interaction.user.id !== applicantId) {
+        return interaction.reply({
+            content: 'This application button is not for you.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    const modal = new ModalBuilder()
+        .setCustomId('simpleApplication')
+        .setTitle('Silent Valley Application');
+
+    const nameInput = new TextInputBuilder()
+        .setCustomId('discordName')
+        .setLabel('What is your Discord name?')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+    modal.addComponents(
+        new ActionRowBuilder().addComponents(nameInput)
+    );
+
+    return interaction.showModal(modal);
+}
+
         if (action === 'deny') {
     const denialModal = new ModalBuilder()
         .setCustomId(`denialReasonModal_${submittedUserId}`)
@@ -877,7 +948,7 @@ try {
 });
 
 //==================//
-//                    CRON JOBS                     //
+//   CRON JOBS     //
 //=================//
 
 cron.schedule('0 14 * * *', async () => {
@@ -912,7 +983,7 @@ cron.schedule('0 14 * * *', async () => {
         console.error(error);
     }
 //=================//
-//                      LOGIN                       //
+//     LOGIN      //
 //================//
 
 });
