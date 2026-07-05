@@ -192,6 +192,22 @@ const auth = new google.auth.GoogleAuth({
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
 }
+//======================//
+// Application Sessions //
+//======================//
+
+const applicationSessions = new Map();
+
+//======================//
+// Test Questions       //
+//======================//
+
+const demoQuestions = [
+    {
+        section: 'Discord Information',
+        question: 'What is your Discord Name?'
+    }
+];
 
 //==================================================//
 //               INTERACTION HANDLER                //
@@ -830,121 +846,133 @@ if (interaction.commandName === 'apply') {
 //======================//
 // Button Interactions  //
 //======================//
-    if (interaction.isButton()) {
 
-        const member = interaction.member;
+if (interaction.isButton()) {
 
-        const allowedRoleIds = process.env.STAFF_ROLE_IDS.split(',');
+    //==============================//
+    // Begin Application Button     //
+    //==============================//
 
-const hasAllowedRole = allowedRoleIds.some(roleId =>
-    member.roles.cache.has(roleId)
-);
+    if (interaction.customId.startsWith('startSimpleApplication_')) {
+        const applicantId = interaction.customId.split('_')[1];
 
-if (!hasAllowedRole) {
+        if (interaction.user.id !== applicantId) {
             return interaction.reply({
-                content: 'You do not have permission to review submissions.',
+                content: 'This application button is not for you.',
                 flags: MessageFlags.Ephemeral
             });
         }
 
-        const [action, submittedUserId] = interaction.customId.split('_');
+        try {
 
-        const oldEmbed = interaction.message.embeds[0];
+    applicationSessions.set(interaction.user.id, {
+        currentQuestion: 0,
+        answers: []
+    });
 
-        const newEmbed = EmbedBuilder.from(oldEmbed);
+    await interaction.user.send(
+        `🌠 **Silent Valley Entrance Examination**
 
-        if (action === 'accept') {
-            newEmbed
-                .setColor(0x57F287)
-                .setFields(
-                    oldEmbed.fields.filter(field => field.name !== 'Status')
-                )
-                .addFields({
-                    name: 'Status',
-                    value: `Accepted by <@${interaction.user.id}>`,
-                    inline: false
-                });
-try {
-await appendSubmissionToSheet({
-    discordId: submittedUserId,
-    displayName: oldEmbed.fields.find(f => f.name === 'Display Name')?.value || 'Unknown',
-    species: oldEmbed.fields.find(f => f.name === 'Species')?.value || 'Unknown',
-    evolution: oldEmbed.fields.find(f => f.name === 'Evolutionary Standing')?.value || 'Unknown',
-    evidence: oldEmbed.fields.find(f => f.name === 'Evidence Link')?.value || 'Unknown',
-    characterSheet: oldEmbed.fields.find(f => f.name === 'Character Sheet')?.value || 'Unknown',
-    status: 'Accepted',
-    reviewedBy: interaction.user.tag
-});
-} catch (error) {
-    console.error('Failed to write to Google Sheets:', error.message);
-}
-const acceptedSpecies = oldEmbed.fields.find(f => f.name === 'Species')?.value || 'Unknown';
-const acceptedEvolution = oldEmbed.fields.find(f => f.name === 'Evolutionary Standing')?.value || 'Unknown';
+Welcome!
 
-try {
-    const submittedUser = await client.users.fetch(submittedUserId);
+Thank you for applying to Silent Valley.
 
-    await submittedUser.send(
-        `<:Meteorite:1504809803791335517> Your evolution submission was accepted!\n\n` +
-        `**Species:** ${acceptedSpecies}\n` +
-        `**Evolutionary Standing:** ${acceptedEvolution}\n\n` +
-        `Congratulations! Your submission has been approved.`
+Let's begin!
+
+━━━━━━━━━━━━━━━━━━━━━━`
     );
-} catch (error) {
-    console.log('Could not DM user:', error.message);
-}
-            await interaction.update({
-                embeds: [newEmbed],
-                components: []
+
+    const question = demoQuestions[0];
+
+    await interaction.user.send(
+        `━━━━━━━━━━━━━━━━━━━━━━
+
+<:Meteorite:1504809803791335517> **Silent Valley Office** <:Meteorite:1504809803791335517>
+
+📋 Question 1 of 1
+
+📁 **${question.section}**
+
+❓ ${question.question}
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+Reply with your answer below.`
+    );
+
+    await interaction.reply({
+        content: "📬 I've sent you a DM to begin your application!",
+        flags: MessageFlags.Ephemeral
+    });
+
+} catch {
+            await interaction.reply({
+                content: "❌ I couldn't send you a DM.\n\nPlease enable Direct Messages from server members and try again.",
+                flags: MessageFlags.Ephemeral
             });
         }
 
-        if (interaction.customId.startsWith('startSimpleApplication_')) {
+        return;
+    }
+    //==============================//
+    // Evolution Review Buttons     //
+    //==============================//
 
-    const applicantId = interaction.customId.split('_')[1];
+    const member = interaction.member;
+    const allowedRoleIds = process.env.STAFF_ROLE_IDS.split(',');
 
-    if (interaction.user.id !== applicantId) {
+    const hasAllowedRole = allowedRoleIds.some(roleId =>
+        member.roles.cache.has(roleId)
+    );
+
+    if (!hasAllowedRole) {
         return interaction.reply({
-            content: 'This application button is not for you.',
+            content: 'You do not have permission to review submissions.',
             flags: MessageFlags.Ephemeral
         });
     }
 
-    const modal = new ModalBuilder()
-        .setCustomId('simpleApplication')
-        .setTitle('Silent Valley Application');
+    const [action, submittedUserId] = interaction.customId.split('_');
+    const oldEmbed = interaction.message.embeds[0];
+    const newEmbed = EmbedBuilder.from(oldEmbed);
 
-    const nameInput = new TextInputBuilder()
-        .setCustomId('discordName')
-        .setLabel('What is your Discord name?')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
+    if (action === 'accept') {
+        newEmbed
+            .setColor(0x57F287)
+            .setFields(oldEmbed.fields.filter(field => field.name !== 'Status'))
+            .addFields({
+                name: 'Status',
+                value: `Accepted by <@${interaction.user.id}>`,
+                inline: false
+            });
 
-    modal.addComponents(
-        new ActionRowBuilder().addComponents(nameInput)
-    );
+        await interaction.update({
+            embeds: [newEmbed],
+            components: []
+        });
 
-    return interaction.showModal(modal);
-}
-
-        if (action === 'deny') {
-    const denialModal = new ModalBuilder()
-        .setCustomId(`denialReasonModal_${submittedUserId}`)
-        .setTitle('Reason for Not Accepting');
-
-    const reasonInput = new TextInputBuilder()
-        .setCustomId('denialReason')
-        .setLabel('Why was this submission not accepted?')
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true);
-
-    denialModal.addComponents(
-        new ActionRowBuilder().addComponents(reasonInput)
-    );
-
-    await interaction.showModal(denialModal);
-}
+        return;
     }
+
+    if (action === 'deny') {
+        const denialModal = new ModalBuilder()
+            .setCustomId(`denialReasonModal_${submittedUserId}`)
+            .setTitle('Reason for Not Accepting');
+
+        const reasonInput = new TextInputBuilder()
+            .setCustomId('denialReason')
+            .setLabel('Why was this submission not accepted?')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
+
+        denialModal.addComponents(
+            new ActionRowBuilder().addComponents(reasonInput)
+        );
+
+        await interaction.showModal(denialModal);
+        return;
+    }
+}
 });
 
 //==================//
