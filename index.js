@@ -343,70 +343,78 @@ client.on('messageCreate', async message => {
     session.currentQuestion++;
 
     if (session.currentQuestion >= session.questions.length) {
-    const reviewChannel = await client.channels.fetch(process.env.APPLICATION_REVIEW_CHANNEL_ID);
+    try {
+        const reviewChannel = await client.channels.fetch(process.env.APPLICATION_REVIEW_CHANNEL_ID);
 
-    const submittedAt = new Date();
+        const submittedAt = new Date();
 
-    const applicationEmbed = new EmbedBuilder()
-    .setColor(0xD6A84F)
-    .setTitle('<:Meteorite:1504809803791335517> Silent Valley Application <:Meteorite:1504809803791335517>')
-    .setDescription(
-        `### Applicant File\n\n` +
-        `👤 **Applicant:** <@${session.applicant.id}>\n` +
-        `🏷️ **Username:** ${session.applicant.username}\n` +
-        `🆔 **Discord ID:** ${session.applicant.id}\n\n` +
-        `🕒 **Started:** ${session.startedAt.toLocaleString()}\n` +
-        `📨 **Submitted:** ${submittedAt.toLocaleString()}\n` +
-        `📋 **Questions Answered:** ${session.answers.length}`
-    )
-    .setFooter({
-        text: 'Silent Valley Office • Pending Staff Review'
-    })
-    .setTimestamp();
+        const applicationEmbed = new EmbedBuilder()
+            .setColor(0xD6A84F)
+            .setTitle('<:Meteorite:1504809803791335517> Silent Valley Application <:Meteorite:1504809803791335517>')
+            .setDescription(
+                `### Applicant File\n\n` +
+                `👤 **Applicant:** <@${session.applicant.id}>\n` +
+                `🏷️ **Username:** ${session.applicant.username}\n` +
+                `🆔 **Discord ID:** ${session.applicant.id}\n\n` +
+                `🕒 **Started:** ${session.startedAt.toLocaleString()}\n` +
+                `📨 **Submitted:** ${submittedAt.toLocaleString()}\n` +
+                `📋 **Questions Answered:** ${session.answers.length}`
+            )
+            .setFooter({
+                text: 'Silent Valley Office • Pending Staff Review'
+            })
+            .setTimestamp();
 
-    for (const [index, entry] of session.answers.entries()) {
+        for (const [index, entry] of session.answers.entries()) {
+            applicationEmbed.addFields({
+                name: `${index + 1}. ${entry.question}`.slice(0, 256),
+                value: (
+                    `📁 **Section:** ${entry.section}\n\n` +
+                    `📝 **Applicant Response:**\n${entry.applicantAnswer}\n\n` +
+                    `📌 **Answer Reference:**\n${entry.expectedAnswer}`
+                ).slice(0, 1024),
+                inline: false
+            });
+        }
 
-    applicationEmbed.addFields({
-        name: `${index + 1}. ${entry.question}`.slice(0, 256),
-        value:
-            `📁 **Section:** ${entry.section}\n\n` +
-            `📝 **Applicant Response:**\n${entry.applicantAnswer}\n\n` +
-            `📌 **Answer Reference:**\n${entry.expectedAnswer}`,
-        inline: false
-    });
+        const applicationButtons = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`applicationAccept_${session.applicant.id}`)
+                .setLabel('Accept Application')
+                .setStyle(ButtonStyle.Success),
 
-}
+            new ButtonBuilder()
+                .setCustomId(`applicationDeny_${session.applicant.id}`)
+                .setLabel('Deny Application')
+                .setStyle(ButtonStyle.Danger)
+        );
 
-    const applicationButtons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-        .setCustomId(`applicationAccept_${session.applicant.id}`)
-        .setLabel('Accept Application')
-        .setStyle(ButtonStyle.Success),
+        await reviewChannel.send({
+            embeds: [applicationEmbed],
+            components: [applicationButtons]
+        });
 
-    new ButtonBuilder()
-        .setCustomId(`applicationDeny_${session.applicant.id}`)
-        .setLabel('Deny Application')
-        .setStyle(ButtonStyle.Danger)
-);
+        pendingApplications.set(session.applicant.id, session);
+        applicationSessions.delete(message.author.id);
 
-    await reviewChannel.send({
-        embeds: [applicationEmbed],
-        components: [applicationButtons]
-});
+        await message.reply(
+            '✅ **Application Received**\n\n' +
+            'Your entrance examination has been submitted to the Silent Valley staff team for review.'
+        );
 
-    pendingApplications.set(
-        session.applicant.id,
-        session
-);
+        return;
 
-    applicationSessions.delete(message.author.id);
+    } catch (error) {
+        console.error('Application final submit failed:', error);
 
-    await message.reply(
-        '✅ **Application Received**\n\n' +
-        'Your entrance examination has been submitted to the Silent Valley staff team for review.'
-    );
+        await message.reply(
+            '❌ **Application Submission Error**\n\n' +
+            'Your answers were received, but the Office had trouble submitting your application for staff review.\n\n' +
+            'Please contact a staff member so they can check the bot console.'
+        );
 
-    return;
+        return;
+    }
 }
 
     const nextQuestion = session.questions[session.currentQuestion];
