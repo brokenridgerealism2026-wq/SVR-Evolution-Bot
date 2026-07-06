@@ -367,7 +367,7 @@ client.on('messageCreate', async message => {
     for (const [index, entry] of session.answers.entries()) {
 
     applicationEmbed.addFields({
-        name: `${index + 1}. ${entry.question}`,
+        name: `${index + 1}. ${entry.question}`.slice(0, 256),
         value:
             `📁 **Section:** ${entry.section}\n\n` +
             `📝 **Applicant Response:**\n${entry.applicantAnswer}\n\n` +
