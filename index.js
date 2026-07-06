@@ -389,10 +389,13 @@ client.on('messageCreate', async message => {
                 .setStyle(ButtonStyle.Danger)
         );
 
-        await reviewChannel.send({
+        const reviewMessage = await reviewChannel.send({
             embeds: [applicationEmbed],
             components: [applicationButtons]
         });
+
+        session.reviewChannelId = reviewChannel.id;
+        session.reviewMessageId = reviewMessage.id;
 
         pendingApplications.set(session.applicant.id, session);
         applicationSessions.delete(message.author.id);
@@ -1206,7 +1209,7 @@ if (interaction.customId.startsWith('applicationAccept_')) {
 
     await applicant.send(
         '✅ **Application Accepted**\n\n' +
-        'Your Silent Valley application has been accepted!'
+        'Your application has been accepted! Please familiarize yourself with the discord, especially the Server Info section! If you have any questions please feel free to utilize our Staff Questions channel in Help desk and our Ranger Questions in Species Info.'
     ).catch(() => {});
 
         pendingApplications.delete(applicantId);
@@ -1217,26 +1220,24 @@ if (interaction.customId.startsWith('applicationAccept_')) {
 if (interaction.customId.startsWith('applicationDeny_')) {
     const applicantId = interaction.customId.split('_')[1];
 
-    const oldEmbed = interaction.message.embeds[0];
-    const newEmbed = EmbedBuilder.from(oldEmbed)
-        .setColor(0xED4245)
-        .setFooter({
-            text: `Silent Valley Office • Denied by ${interaction.user.username}`
-        });
+const denialModal = new ModalBuilder()
+    .setCustomId(`applicationDenialReason_${applicantId}`)
+    .setTitle('Application Denial');
 
-    await interaction.update({
-        embeds: [newEmbed],
-        components: []
-    });
+const reasonInput = new TextInputBuilder()
+    .setCustomId('reason')
+    .setLabel('Reason for denying this application')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(true)
+    .setMaxLength(1000);
 
-    const applicant = await client.users.fetch(applicantId);
+denialModal.addComponents(
+    new ActionRowBuilder().addComponents(reasonInput)
+);
 
-    await applicant.send(
-        '❌ **Application Denied**\n\n' +
-        'Your Silent Valley application was not accepted at this time.'
-    ).catch(() => {});
+await interaction.showModal(denialModal);
 
-    return;
+return;
 }
 
     //==============================//
@@ -1298,6 +1299,73 @@ if (interaction.customId.startsWith('applicationDeny_')) {
         return;
     }
 }
+
+
+//======================//
+// Modal Interactions   //
+//======================//
+
+if (interaction.isModalSubmit()) {
+
+    if (interaction.customId.startsWith('applicationDenialReason_')) {
+
+        const applicantId = interaction.customId.split('_')[1];
+
+        const application = pendingApplications.get(applicantId);
+
+        if (!application) {
+            return interaction.reply({
+                content: 'This application could not be found.',
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        const reason = interaction.fields.getTextInputValue('reason');
+
+        const reviewChannel = await client.channels.fetch(application.reviewChannelId);
+
+        const reviewMessage = await reviewChannel.messages.fetch(application.reviewMessageId);
+
+        const oldEmbed = reviewMessage.embeds[0];
+
+        const newEmbed = EmbedBuilder.from(oldEmbed)
+            .setColor(0xED4245)
+            .setFooter({
+                text: `Silent Valley Office • Denied by ${interaction.user.username}`
+            })
+            .addFields({
+                name: 'Application Status',
+                value:
+                    `🔴 **Denied**\n\n` +
+                    `**Reviewed By:** ${interaction.user.username}\n` +
+                    `**Reason:**\n${reason}`
+            });
+
+        await reviewMessage.edit({
+            embeds: [newEmbed],
+            components: []
+        });
+
+        await interaction.reply({
+    content: '✅ Application denied successfully.',
+    flags: MessageFlags.Ephemeral
+});
+
+        const applicant = await client.users.fetch(applicantId);
+
+        await applicant.send(
+            `🌠 **Silent Valley Office**\n\n` +
+            `Unfortunately, your application was not approved at this time.\n\n` +
+            `**Staff Feedback:**\n${reason}\n\n` +
+            `You are welcome to review the rules and apply again in the future.`
+        ).catch(() => {});
+
+        pendingApplications.delete(applicantId);
+
+        return;
+    }
+
+    }
 });
 
 //==================//
@@ -1338,6 +1406,14 @@ cron.schedule('0 14 * * *', async () => {
 //=================//
 //     LOGIN      //
 //================//
+
+process.on('unhandledRejection', error => {
+    console.error('UNHANDLED REJECTION:', error);
+});
+
+process.on('uncaughtException', error => {
+    console.error('UNCAUGHT EXCEPTION:', error);
+});
 
 });
 client.login(process.env.DISCORD_TOKEN);
