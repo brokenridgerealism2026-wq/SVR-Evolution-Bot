@@ -198,13 +198,74 @@ const auth = new google.auth.GoogleAuth({
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
 }
+
+async function getApplicationQuestions() {
+    const credentials = process.env.GOOGLE_CREDENTIALS_JSON
+        ? JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON)
+        : require('./google-credentials.json');
+
+    const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+
+    const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.SHEET_ID,
+        range: 'ApplicationQuestions!A:G'
+    });
+
+    const rows = response.data.values || [];
+
+    return rows.slice(1).map(row => ({
+        id: row[0],
+        section: row[1],
+        type: row[2],
+        question: row[3],
+        answer: row[4],
+        required: row[5],
+        active: row[6]
+    }));
+}
+
+async function addPlayerToRegistry(data) {
+    const credentials = process.env.GOOGLE_CREDENTIALS_JSON
+        ? JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON)
+        : require('./google-credentials.json');
+
+    const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+
+    await sheets.spreadsheets.values.append({
+        spreadsheetId: process.env.SHEET_ID,
+        range: 'PlayerRegistry!A1:F',
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+            values: [[
+                data.discordUsername,
+                data.discordId,
+                data.alderonId,
+                data.alderonIgn,
+                data.approvedOn,
+                data.approvedBy
+            ]]
+        }
+    });
+}
 //======================//
 // Application Sessions //
 //======================//
 
 const applicationSessions = new Map();
-
+const pendingApplications = new Map();
 const processedDmMessages = new Set();
+
+const OPTIONAL_QUESTION_COUNT = 10;
 
 //======================//
 // Test Questions       //
@@ -214,6 +275,10 @@ const demoQuestions = [
     {
         section: 'Discord Information',
         question: 'What is your Discord Name?'
+    },
+    {
+        section: 'Discord Information',
+        question: 'What is your Discord ID? (Right click your name and select "Copy ID")'
     }
 ];
 
@@ -256,26 +321,105 @@ client.on('messageCreate', async message => {
 
     if (message.author.bot) return;
     if (message.guild) return;
-    if (processedDmMessages.has(message.id)) return;
-        processedDmMessages.add(message.id);
 
-    console.log('DM received from', message.author.id, ':', message.content);
+    if (processedDmMessages.has(message.id)) return;
+    processedDmMessages.add(message.id);
 
     const session = applicationSessions.get(message.author.id);
 
     if (!session) return;
 
-    const question = demoQuestions[session.currentQuestion];
+    const question = session.questions[session.currentQuestion];
 
     session.answers.push({
-        question: question.question,
         section: question.section,
-        answer: message.content
+        question: question.question,
+        applicantAnswer: message.content,
+        expectedAnswer: question.answer || 'Staff review required',
+        required: question.required || 'No',
+        type: question.type || 'Short'
     });
 
+    session.currentQuestion++;
+
+    if (session.currentQuestion >= session.questions.length) {
+    const reviewChannel = await client.channels.fetch(process.env.APPLICATION_REVIEW_CHANNEL_ID);
+
+    const submittedAt = new Date();
+
+    const applicationEmbed = new EmbedBuilder()
+    .setColor(0xD6A84F)
+    .setTitle('<:Meteorite:1504809803791335517> Silent Valley Application <:Meteorite:1504809803791335517>')
+    .setDescription(
+        `### Applicant File\n\n` +
+        `👤 **Applicant:** <@${session.applicant.id}>\n` +
+        `🏷️ **Username:** ${session.applicant.username}\n` +
+        `🆔 **Discord ID:** ${session.applicant.id}\n\n` +
+        `🕒 **Started:** ${session.startedAt.toLocaleString()}\n` +
+        `📨 **Submitted:** ${submittedAt.toLocaleString()}\n` +
+        `📋 **Questions Answered:** ${session.answers.length}`
+    )
+    .setFooter({
+        text: 'Silent Valley Office • Pending Staff Review'
+    })
+    .setTimestamp();
+
+    for (const [index, entry] of session.answers.entries()) {
+
+    applicationEmbed.addFields({
+        name: `${index + 1}. ${entry.question}`,
+        value:
+            `📁 **Section:** ${entry.section}\n\n` +
+            `📝 **Applicant Response:**\n${entry.applicantAnswer}\n\n` +
+            `📌 **Answer Reference:**\n${entry.expectedAnswer}`,
+        inline: false
+    });
+
+}
+
+    const applicationButtons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+        .setCustomId(`applicationAccept_${session.applicant.id}`)
+        .setLabel('Accept Application')
+        .setStyle(ButtonStyle.Success),
+
+    new ButtonBuilder()
+        .setCustomId(`applicationDeny_${session.applicant.id}`)
+        .setLabel('Deny Application')
+        .setStyle(ButtonStyle.Danger)
+);
+
+    await reviewChannel.send({
+        embeds: [applicationEmbed],
+        components: [applicationButtons]
+});
+
+    pendingApplications.set(
+        session.applicant.id,
+        session
+);
+
+    applicationSessions.delete(message.author.id);
+
     await message.reply(
-        "✅ Answer saved!\n\n" +
-        `You answered:\n> ${message.content}`
+        '✅ **Application Received**\n\n' +
+        'Your entrance examination has been submitted to the Silent Valley staff team for review.'
+    );
+
+    return;
+}
+
+    const nextQuestion = session.questions[session.currentQuestion];
+
+    await message.reply(
+        `✅ Response added to your application!\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `<:Meteorite:1504809803791335517> **Silent Valley Office** <:Meteorite:1504809803791335517>\n\n` +
+        `📋 Question ${session.currentQuestion + 1} of ${session.questions.length}\n\n` +
+        `📁 **${nextQuestion.section}**\n\n` +
+        `❓ ${nextQuestion.question}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `Reply with your answer below.`
     );
 
 });
@@ -909,10 +1053,47 @@ if (interaction.isButton()) {
     });
 
     try {
+    const sheetQuestions = await getApplicationQuestions();
+
+    const activeQuestions = sheetQuestions.filter(q =>
+    q.active?.toLowerCase() === 'yes'
+    );
+
+    const requiredQuestions = activeQuestions.filter(q =>
+    q.required?.toLowerCase() === 'yes'
+    );
+
+    const optionalQuestions = activeQuestions.filter(q =>
+    q.required?.toLowerCase() !== 'yes'
+    );
+
+    const shuffledOptional = optionalQuestions.sort(() => Math.random() - 0.5);
+
+    const selectedOptional = shuffledOptional.slice(
+    0,
+    OPTIONAL_QUESTION_COUNT
+    );
+
+    const applicationQuestions = [
+    ...requiredQuestions,
+    ...selectedOptional
+    ];
+console.log(
+    `Application built: ${requiredQuestions.length} required + ${selectedOptional.length} optional`
+);
+
         applicationSessions.set(interaction.user.id, {
+            startedAt: new Date(),
             currentQuestion: 0,
-            answers: []
-        });
+            questions: applicationQuestions,
+            answers: [],
+            applicant: {
+                id: interaction.user.id,
+                username: interaction.user.username,
+                displayName: interaction.user.displayName,
+                tag: interaction.user.tag
+        }
+});
 
         await interaction.user.send(
             `🌠 **Silent Valley Entrance Examination**
@@ -926,7 +1107,7 @@ Let's begin!
 ━━━━━━━━━━━━━━━━━━━━━━`
         );
 
-        const question = demoQuestions[0];
+        const question = activeQuestions[0];
 
         await interaction.user.send(
             `━━━━━━━━━━━━━━━━━━━━━━
@@ -958,6 +1139,98 @@ Reply with your answer below.`
 
     return;
 }
+
+//==============================//
+// Application Review Buttons   //
+//==============================//
+
+if (interaction.customId.startsWith('applicationAccept_')) {
+    const applicantId = interaction.customId.split('_')[1];
+
+    const application = pendingApplications.get(applicantId);
+
+    if (!application) {
+        return interaction.reply({
+            content: 'This application could not be found. It may have already been processed.',
+            flags: MessageFlags.Ephemeral
+        });
+    }
+
+    const discordUsername = application.answers.find(
+        a => a.type === 'discord_username'
+    )?.applicantAnswer || application.applicant.username;
+
+    const alderonIgn = application.answers.find(
+        a => a.type === 'alderon_ign'
+    )?.applicantAnswer || 'Unknown';
+
+    const alderonId = application.answers.find(
+        a => a.type === 'alderon_id'
+    )?.applicantAnswer || 'Unknown';
+
+    const oldEmbed = interaction.message.embeds[0];
+    const newEmbed = EmbedBuilder.from(oldEmbed)
+        .setColor(0x57F287)
+        .setFooter({
+            text: `Silent Valley Office • Accepted by ${interaction.user.username}`
+        });
+
+    await addPlayerToRegistry({
+        discordUsername,
+        discordId: applicantId,
+        alderonId,
+        alderonIgn,
+        approvedOn: new Date().toLocaleString(),
+        approvedBy: interaction.user.username
+    });
+
+    const guild = interaction.guild;
+    const member = await guild.members.fetch(applicantId);
+
+    await member.roles.add(process.env.APPROVED_MEMBER_ROLE_ID);
+
+    await interaction.update({
+        embeds: [newEmbed],
+        components: []
+    });
+
+    const applicant = await client.users.fetch(applicantId);
+
+    await applicant.send(
+        '✅ **Application Accepted**\n\n' +
+        'Your Silent Valley application has been accepted!'
+    ).catch(() => {});
+
+        pendingApplications.delete(applicantId);
+
+    return;
+}
+
+if (interaction.customId.startsWith('applicationDeny_')) {
+    const applicantId = interaction.customId.split('_')[1];
+
+    const oldEmbed = interaction.message.embeds[0];
+    const newEmbed = EmbedBuilder.from(oldEmbed)
+        .setColor(0xED4245)
+        .setFooter({
+            text: `Silent Valley Office • Denied by ${interaction.user.username}`
+        });
+
+    await interaction.update({
+        embeds: [newEmbed],
+        components: []
+    });
+
+    const applicant = await client.users.fetch(applicantId);
+
+    await applicant.send(
+        '❌ **Application Denied**\n\n' +
+        'Your Silent Valley application was not accepted at this time.'
+    ).catch(() => {});
+
+    return;
+}
+
     //==============================//
     // Evolution Review Buttons     //
     //==============================//
